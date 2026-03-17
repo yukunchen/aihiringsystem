@@ -1,0 +1,74 @@
+-- V2__seed_data.sql
+
+-- Permissions
+INSERT INTO permissions (id, name, description) VALUES
+    ('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'user:read', 'Read users'),
+    ('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'user:manage', 'Create/update/delete users'),
+    ('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13', 'department:read', 'Read departments'),
+    ('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a14', 'department:manage', 'Create/update/delete departments'),
+    ('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a15', 'role:read', 'Read roles'),
+    ('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a16', 'role:manage', 'Create/update/delete roles'),
+    ('01000000-0000-0000-0000-000000000001', 'resume:read', 'Read resumes'),
+    ('01000000-0000-0000-0000-000000000002', 'resume:manage', 'Manage resumes'),
+    ('01000000-0000-0000-0000-000000000003', 'job:read', 'Read job descriptions'),
+    ('01000000-0000-0000-0000-000000000004', 'job:manage', 'Manage job descriptions'),
+    ('01000000-0000-0000-0000-000000000005', 'match:read', 'Read match results'),
+    ('01000000-0000-0000-0000-000000000006', 'match:execute', 'Execute matching');
+
+-- Roles
+INSERT INTO roles (id, name, description) VALUES
+    ('02000000-0000-0000-0000-000000000001', 'SUPER_ADMIN', 'Super Administrator'),
+    ('02000000-0000-0000-0000-000000000002', 'HR_ADMIN', 'HR Administrator'),
+    ('02000000-0000-0000-0000-000000000003', 'DEPT_ADMIN', 'Department Administrator'),
+    ('02000000-0000-0000-0000-000000000004', 'USER', 'Regular User');
+
+-- Role-Permission assignments
+-- SUPER_ADMIN gets all permissions
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT '02000000-0000-0000-0000-000000000001', id FROM permissions;
+
+-- HR_ADMIN
+INSERT INTO role_permissions (role_id, permission_id) VALUES
+    ('02000000-0000-0000-0000-000000000002', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'),
+    ('02000000-0000-0000-0000-000000000002', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12'),
+    ('02000000-0000-0000-0000-000000000002', 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13'),
+    ('02000000-0000-0000-0000-000000000002', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a14'),
+    ('02000000-0000-0000-0000-000000000002', 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a15'),
+    ('02000000-0000-0000-0000-000000000002', 'f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a16'),
+    ('02000000-0000-0000-0000-000000000002', '01000000-0000-0000-0000-000000000001'),
+    ('02000000-0000-0000-0000-000000000002', '01000000-0000-0000-0000-000000000002'),
+    ('02000000-0000-0000-0000-000000000002', '01000000-0000-0000-0000-000000000003'),
+    ('02000000-0000-0000-0000-000000000002', '01000000-0000-0000-0000-000000000004'),
+    ('02000000-0000-0000-0000-000000000002', '01000000-0000-0000-0000-000000000005'),
+    ('02000000-0000-0000-0000-000000000002', '01000000-0000-0000-0000-000000000006');
+
+-- DEPT_ADMIN
+INSERT INTO role_permissions (role_id, permission_id) VALUES
+    ('02000000-0000-0000-0000-000000000003', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'),
+    ('02000000-0000-0000-0000-000000000003', 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13'),
+    ('02000000-0000-0000-0000-000000000003', '01000000-0000-0000-0000-000000000001'),
+    ('02000000-0000-0000-0000-000000000003', '01000000-0000-0000-0000-000000000002'),
+    ('02000000-0000-0000-0000-000000000003', '01000000-0000-0000-0000-000000000003'),
+    ('02000000-0000-0000-0000-000000000003', '01000000-0000-0000-0000-000000000004'),
+    ('02000000-0000-0000-0000-000000000003', '01000000-0000-0000-0000-000000000005'),
+    ('02000000-0000-0000-0000-000000000003', '01000000-0000-0000-0000-000000000006');
+
+-- USER
+INSERT INTO role_permissions (role_id, permission_id) VALUES
+    ('02000000-0000-0000-0000-000000000004', '01000000-0000-0000-0000-000000000001'),
+    ('02000000-0000-0000-0000-000000000004', '01000000-0000-0000-0000-000000000003'),
+    ('02000000-0000-0000-0000-000000000004', '01000000-0000-0000-0000-000000000005');
+
+-- Default Department
+INSERT INTO departments (id, name, parent_id) VALUES
+    ('03000000-0000-0000-0000-000000000001', 'Headquarters', NULL),
+    ('03000000-0000-0000-0000-000000000002', 'Engineering', '03000000-0000-0000-0000-000000000001'),
+    ('03000000-0000-0000-0000-000000000003', 'Human Resources', '03000000-0000-0000-0000-000000000001');
+
+-- Default Admin User (password: admin123, BCrypt hashed)
+INSERT INTO users (id, username, password, email, enabled, department_id) VALUES
+    ('04000000-0000-0000-0000-000000000001', 'admin', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZRGdjGj/n3.rsW4WzOFbMB3dHI.Hu', 'admin@aihiring.com', TRUE, '03000000-0000-0000-0000-000000000001');
+
+-- Assign admin to SUPER_ADMIN role
+INSERT INTO user_roles (user_id, role_id) VALUES
+    ('04000000-0000-0000-0000-000000000001', '02000000-0000-0000-0000-000000000001');
