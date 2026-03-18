@@ -98,3 +98,27 @@ CREATE INDEX IF NOT EXISTS idx_resumes_source ON resumes(source);
 CREATE INDEX IF NOT EXISTS idx_resumes_status ON resumes(status);
 CREATE INDEX IF NOT EXISTS idx_resumes_uploaded_by ON resumes(uploaded_by);
 CREATE INDEX IF NOT EXISTS idx_resumes_created_at ON resumes(created_at DESC);
+
+-- Job Descriptions (H2-compatible: VARCHAR instead of enum, CLOB instead of JSONB)
+CREATE TABLE IF NOT EXISTS job_descriptions (
+    id UUID DEFAULT RANDOM_UUID() PRIMARY KEY,
+    title VARCHAR(200) NOT NULL,
+    description CLOB NOT NULL,
+    requirements CLOB,
+    skills CLOB,
+    education VARCHAR(50),
+    experience VARCHAR(50),
+    salary_range VARCHAR(100),
+    location VARCHAR(100),
+    status VARCHAR(20) NOT NULL DEFAULT 'DRAFT',
+    department_id UUID NOT NULL REFERENCES departments(id) ON DELETE RESTRICT,
+    created_by UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_job_descriptions_status ON job_descriptions(status);
+CREATE INDEX IF NOT EXISTS idx_job_descriptions_department ON job_descriptions(department_id);
+CREATE INDEX IF NOT EXISTS idx_job_descriptions_created_by ON job_descriptions(created_by);
+CREATE INDEX IF NOT EXISTS idx_job_descriptions_created_at ON job_descriptions(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_job_descriptions_title ON job_descriptions(title);
