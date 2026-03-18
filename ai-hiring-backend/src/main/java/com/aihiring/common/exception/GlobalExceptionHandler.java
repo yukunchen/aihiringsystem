@@ -9,6 +9,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -24,7 +25,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusiness(BusinessException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
+        HttpStatus httpStatus = HttpStatus.resolve(ex.getCode());
+        if (httpStatus == null) httpStatus = HttpStatus.CONFLICT;
+        return ResponseEntity.status(httpStatus)
                 .body(ApiResponse.error(ex.getCode(), ex.getMessage()));
     }
 
@@ -38,6 +41,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleAccessDenied(AccessDeniedException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(ApiResponse.error(403, "Insufficient permissions"));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMaxUploadSize(MaxUploadSizeExceededException ex) {
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error(400, "File size exceeds maximum of 10MB"));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
