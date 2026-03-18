@@ -5,10 +5,15 @@ spring:
     password:
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: none
     open-in-view: false
   flyway:
     enabled: false
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema-h2.sql
+      data-locations: classpath:test-data.sql
 
 jwt:
   secret: test-secret-key-must-be-at-least-32-characters-long!

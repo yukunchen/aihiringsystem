@@ -9,6 +9,14 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+storage:
+  local:
+    base-dir: ${STORAGE_BASE_DIR:./uploads}
 
 jwt:
   secret: ${JWT_SECRET}
