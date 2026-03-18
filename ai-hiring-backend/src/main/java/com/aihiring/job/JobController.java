@@ -68,6 +68,7 @@ public class JobController {
     }
 
     @PutMapping("/{id}/status")
+    @Transactional
     @PreAuthorize("hasAuthority('job:manage')")
     public ApiResponse<JobResponse> changeStatus(
             @PathVariable UUID id,
