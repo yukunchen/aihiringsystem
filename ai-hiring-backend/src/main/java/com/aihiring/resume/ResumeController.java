@@ -15,6 +15,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -40,6 +41,7 @@ public class ResumeController {
     }
 
     @GetMapping
+    @Transactional(readOnly = true)
     @PreAuthorize("hasAuthority('resume:read')")
     public ApiResponse<Page<ResumeListResponse>> list(
             @RequestParam(value = "search", required = false) String search,
@@ -51,6 +53,7 @@ public class ResumeController {
     }
 
     @GetMapping("/{id}")
+    @Transactional(readOnly = true)
     @PreAuthorize("hasAuthority('resume:read')")
     public ApiResponse<ResumeResponse> getById(@PathVariable UUID id) {
         Resume resume = resumeService.getById(id);
@@ -58,6 +61,7 @@ public class ResumeController {
     }
 
     @GetMapping("/{id}/download")
+    @Transactional(readOnly = true)
     @PreAuthorize("hasAuthority('resume:read')")
     public ResponseEntity<Resource> download(@PathVariable UUID id) {
         Resume resume = resumeService.getById(id);
@@ -79,6 +83,7 @@ public class ResumeController {
     }
 
     @PutMapping("/{id}/structured")
+    @Transactional
     @PreAuthorize("hasAuthority('resume:manage')")
     public ApiResponse<ResumeResponse> updateStructured(
             @PathVariable UUID id,
