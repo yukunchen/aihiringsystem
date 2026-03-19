@@ -74,7 +74,7 @@ The backend `POST /api/auth/login` returns `{ accessToken, refreshToken, expires
 
 On app init (`AuthContext` mount): read refresh token from `localStorage`, call `POST /api/auth/refresh` with `{ refreshToken }`. On success, store the new access token in state and decode the JWT payload to populate `user`. On failure, clear `localStorage` and show `/login`.
 
-User info is decoded from the JWT payload (standard claims: `sub` = username, plus any custom claims). No separate `/api/users/me` call required on every page load.
+User info is decoded from the JWT payload (standard claims: `sub` = userId UUID, `username` = username string, `roles` = string[]). No separate `/api/users/me` call required on every page load.
 
 ### AuthContext API
 ```ts
@@ -194,7 +194,7 @@ Divided into two sections:
 **Section 1 — JD Info**
 - Displays: title, department name, status badge, description, requirements, skills, education, experience, salary range, location
 - Status change: `Select` dropdown with valid next-state options — calls `PUT /api/jobs/{id}/status`. On 400/422 (invalid transition): show inline error from response `message` field.
-- "Edit" button → inline form edit mode (same fields as JobCreatePage, saves via `PUT /api/jobs/:id`)
+- "Edit" button → inline form edit mode (same fields as JobCreatePage, saves via `PUT /api/jobs/{id}`)
 
 **Section 2 — AI Matching**
 - "Find Matching Resumes" button with a `top_k` input (number, default 10, max 50)
