@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 import services.vector_store as vs
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope="module")
 def mock_qdrant_client():
     """Replace the Qdrant client for every test to avoid real network calls."""
     mock = AsyncMock()
@@ -17,7 +17,7 @@ def mock_qdrant_client():
 
 
 @pytest.fixture(scope="module")
-def client():
+def client(mock_qdrant_client):
     from main import app
     with TestClient(app) as c:
         yield c
