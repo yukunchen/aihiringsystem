@@ -58,8 +58,8 @@ describe('request()', () => {
       message: 'Validation failed',
       data: { title: 'Title is required' },
     });
-    const error = await request('/api/test').catch((e) => e);
-    expect(error.data).toEqual({ title: 'Title is required' });
+    const error = await request('/api/test').catch((e: unknown) => e as { data: unknown });
+    expect((error as { data: unknown }).data).toEqual({ title: 'Title is required' });
   });
 
   it('throws error with message on other non-2xx', async () => {
