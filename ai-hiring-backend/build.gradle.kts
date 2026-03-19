@@ -41,6 +41,7 @@ dependencies {
     testImplementation("com.h2database:h2")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
+    testImplementation("org.wiremock.integrations:wiremock-spring-boot:3.2.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
