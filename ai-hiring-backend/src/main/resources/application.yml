@@ -31,3 +31,7 @@ springdoc:
     enabled: true
   swagger-ui:
     enabled: true
+
+ai:
+  matching:
+    base-url: ${AI_MATCHING_BASE_URL:http://localhost:8001}

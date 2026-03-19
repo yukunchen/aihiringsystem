@@ -8,6 +8,7 @@ import com.aihiring.job.dto.CreateJobRequest;
 import com.aihiring.job.dto.UpdateJobRequest;
 import com.aihiring.user.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,7 @@ public class JobService {
     private final JobRepository jobRepository;
     private final DepartmentRepository departmentRepository;
     private final UserRepository userRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     private static final Map<JobStatus, Set<JobStatus>> ALLOWED_TRANSITIONS = Map.of(
         JobStatus.DRAFT, Set.of(JobStatus.PUBLISHED),
@@ -54,7 +56,12 @@ public class JobService {
         job.setDepartment(department);
         job.setCreatedBy(user);
 
-        return jobRepository.save(job);
+        JobDescription saved = jobRepository.save(job);
+        eventPublisher.publishEvent(new JobDescriptionSavedEvent(
+            this, saved.getId(), saved.getTitle(), saved.getDescription(),
+            saved.getRequirements(), saved.getSkills()
+        ));
+        return saved;
     }
 
     public JobDescription getById(UUID id) {
@@ -78,7 +85,12 @@ public class JobService {
                 .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
             job.setDepartment(department);
         }
-        return jobRepository.save(job);
+        JobDescription saved = jobRepository.save(job);
+        eventPublisher.publishEvent(new JobDescriptionSavedEvent(
+            this, saved.getId(), saved.getTitle(), saved.getDescription(),
+            saved.getRequirements(), saved.getSkills()
+        ));
+        return saved;
     }
 
     @Transactional
