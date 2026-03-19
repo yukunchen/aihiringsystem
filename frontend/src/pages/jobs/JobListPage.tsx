@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Table, Button, Tag, Popconfirm, Space, message, Empty } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { listJobs, deleteJob, type JobListItem, type Page } from '../../api/jobs';
+import { listJobs, deleteJob, type JobListItem } from '../../api/jobs';
+import type { Page } from '../../api/types';
 
 const STATUS_COLORS: Record<string, string> = {
   DRAFT: 'default', PUBLISHED: 'success', PAUSED: 'warning', CLOSED: 'error',
