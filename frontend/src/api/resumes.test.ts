@@ -29,6 +29,32 @@ describe('resumes API', () => {
     expect(result).toBe(mockBlob);
   });
 
+  it('downloadResume() throws error with status and body text on non-ok response', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      text: () => Promise.resolve('Resume not found'),
+    } as unknown as Response);
+    const { downloadResume } = await import('./resumes');
+    const err = await downloadResume('abc-123').catch((e: unknown) => e as Error & { status?: number });
+    expect(err).toBeInstanceOf(Error);
+    expect(err.status).toBe(404);
+    expect(err.message).toBe('Resume not found');
+  });
+
+  it('downloadResume() falls back to generic message on empty error body', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: false,
+      status: 502,
+      text: () => Promise.resolve(''),
+    } as unknown as Response);
+    const { downloadResume } = await import('./resumes');
+    const err = await downloadResume('abc-123').catch((e: unknown) => e as Error & { status?: number });
+    expect(err).toBeInstanceOf(Error);
+    expect(err.status).toBe(502);
+    expect(err.message).toBe('Download failed (502)');
+  });
+
   it('uploadResume() POSTs multipart and returns resume on success', async () => {
     const mockResume = { id: 'r1', fileName: 'cv.pdf', fileType: 'PDF', source: 'MANUAL', status: 'UPLOADED', uploadedAt: '2026-03-01T00:00:00Z' };
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({

@@ -42,7 +42,14 @@ export async function downloadResume(id: string): Promise<Blob> {
   const headers: Record<string, string> = {};
   if (token) headers['Authorization'] = `Bearer ${token}`;
   const response = await fetch(`/api/resumes/${id}/download`, { headers });
-  if (!response.ok) throw new Error('Download failed');
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    const err: Error & { status?: number } = new Error(
+      text || `Download failed (${response.status})`
+    );
+    err.status = response.status;
+    throw err;
+  }
   return response.blob();
 }
 
