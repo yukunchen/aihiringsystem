@@ -22,7 +22,7 @@
      dev.xxx.com     staging.xxx.com      xxx.com
         :3001            :3002            :3000
         :8081            :8082            :8080
-        :9001            :9002            :9000
+        :8001            :8002            :8000
              │              │              │
              ▼              ▼              ▼
      ┌─────────────────────────────────────────────┐
@@ -55,9 +55,9 @@
 
 | 环境 | 前端 | 后端 | AI服务 | 数据库 |
 |------|------|------|--------|--------|
-| Dev | 3001 | 8081 | 9001 | ai_hiring_dev |
-| Staging | 3002 | 8082 | 9002 | ai_hiring_staging |
-| Production | 3000 | 8080 | 9000 | ai_hiring_prod |
+| Dev | 3001 | 8081 | 8001 | ai_hiring_dev |
+| Staging | 3002 | 8082 | 8002 | ai_hiring_staging |
+| Production | 3000 | 8080 | 8000 | ai_hiring_prod |
 
 ### 端口安全策略
 
@@ -69,10 +69,10 @@
 **内部端口（不对外）：**
 - `3000-3002` — 前端容器
 - `8080-8082` — 后端容器
-- `9000-9002` — AI 服务容器
+- `8000-8002` — AI 服务容器
 - `5432` — PostgreSQL
 - `6333` — Qdrant
-- `9000` (MinIO) — 文件存储
+- `9000-9001` — MinIO (9000=API, 9001=Console)
 
 ## 技术选型
 
@@ -425,9 +425,9 @@ http {
     upstream backend_prod { server 127.0.0.1:8080; }
 
     # AI 服务 upstream
-    upstream ai_dev { server 127.0.0.1:9001; }
-    upstream ai_staging { server 127.0.0.1:9002; }
-    upstream ai_prod { server 127.0.0.1:9000; }
+    upstream ai_dev { server 127.0.0.1:8001; }
+    upstream ai_staging { server 127.0.0.1:8002; }
+    upstream ai_prod { server 127.0.0.1:8000; }
 }
 ```
 
@@ -552,15 +552,15 @@ ENV=$1
 case $ENV in
     dev)
         BACKEND_PORT=8081
-        AI_PORT=9001
+        AI_PORT=8001
         ;;
     staging)
         BACKEND_PORT=8082
-        AI_PORT=9002
+        AI_PORT=8002
         ;;
     prod)
         BACKEND_PORT=8080
-        AI_PORT=9000
+        AI_PORT=8000
         ;;
     *)
         echo "Unknown environment: $ENV"
@@ -681,6 +681,7 @@ public class TestCleanupController {
 | `VPS_USER` | SSH 用户名 |
 | `VPS_SSH_KEY` | SSH 私钥（部署专用） |
 | `OPENAI_API_KEY` | OpenAI API 密钥 |
+| `TEST_SECRET` | E2E 测试数据清理接口密钥 |
 
 ## 测试策略
 
