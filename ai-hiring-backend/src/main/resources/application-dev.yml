@@ -30,3 +30,6 @@ springdoc:
     enabled: true
   swagger-ui:
     enabled: true
+
+test:
+  secret: ${TEST_SECRET:}
