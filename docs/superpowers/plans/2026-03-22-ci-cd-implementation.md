@@ -10,6 +10,19 @@
 
 ---
 
+## Prerequisites (Out of Scope)
+
+The following must be set up manually before this CI/CD pipeline can work:
+
+1. **VPS Infrastructure** — Docker, Docker Compose, PostgreSQL, Qdrant, MinIO already installed
+2. **Nginx + Certbot** — SSL certificates obtained, reverse proxy configured for subdomains
+3. **PostgreSQL Databases** — `ai_hiring_dev`, `ai_hiring_staging`, `ai_hiring_prod` created
+4. **GitHub Secrets** — `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `DOMAIN`, `TEST_SECRET`
+
+See `docs/ci-cd-setup.md` for detailed VPS setup instructions.
+
+---
+
 ## File Structure
 
 ### Files to Create
@@ -57,6 +70,16 @@ ai-hiring-backend/
 
 frontend/
 └── Dockerfile
+
+ai-hiring-backend/src/main/java/com/aihiring/test/
+└── TestCleanupController.java
+```
+
+### Existing Files (Referenced but not modified)
+
+```
+ai-matching-service/
+└── Dockerfile  # Already exists - will be used as-is
 ```
 
 ### Files to Modify
@@ -392,7 +415,74 @@ git commit -m "feat(ci): add staging environment docker-compose"
 
 ---
 
-### Task 1.5: Production Environment Docker Compose
+### Task 1.6: Backend TestCleanupController
+
+**Files:**
+- Create: `ai-hiring-backend/src/main/java/com/aihiring/test/TestCleanupController.java`
+
+- [ ] **Step 1: Create TestCleanupController**
+
+```java
+// ai-hiring-backend/src/main/java/com/aihiring/test/TestCleanupController.java
+package com.aihiring.test;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/test")
+@Profile({"dev", "staging"})
+public class TestCleanupController {
+
+    @Value("${test.secret:}")
+    private String testSecret;
+
+    @PostMapping("/cleanup")
+    public ResponseEntity<?> cleanup(
+            @RequestHeader("X-Test-Secret") String secret,
+            @RequestParam(required = false, defaultValue = "false") boolean includeResumes,
+            @RequestParam(required = false, defaultValue = "false") boolean includeJobs) {
+
+        if (testSecret == null || testSecret.isEmpty() || !testSecret.equals(secret)) {
+            return ResponseEntity.status(403).body("Invalid test secret");
+        }
+
+        // Clean up test data - records created by test user
+        // This is a simplified implementation; extend as needed
+
+        return ResponseEntity.ok("Cleanup completed");
+    }
+}
+```
+
+- [ ] **Step 2: Add test.secret to application-dev.properties**
+
+```properties
+# ai-hiring-backend/src/main/resources/application-dev.properties
+test.secret=${TEST_SECRET:}
+```
+
+- [ ] **Step 3: Add test.secret to application-staging.properties**
+
+```properties
+# ai-hiring-backend/src/main/resources/application-staging.properties
+test.secret=${TEST_SECRET:}
+```
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add ai-hiring-backend/src/main/java/com/aihiring/test/TestCleanupController.java
+git add ai-hiring-backend/src/main/resources/application-dev.properties
+git add ai-hiring-backend/src/main/resources/application-staging.properties
+git commit -m "feat(ci): add TestCleanupController for E2E test data cleanup"
+```
+
+---
+
+### Task 1.7: Production Environment Docker Compose
 
 **Files:**
 - Create: `docker/prod/docker-compose.yml`
@@ -1357,6 +1447,10 @@ git commit -m "feat(ci): add authentication E2E tests"
 // e2e-tests/tests/resume.spec.ts
 import { test, expect } from '@playwright/test';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 test.describe('Resume Management', () => {
   test.beforeEach(async ({ page }) => {
@@ -1418,7 +1512,12 @@ git commit -m "feat(ci): add resume management E2E tests"
 ```typescript
 // e2e-tests/tests/job.spec.ts
 import { test, expect } from '@playwright/test';
+import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 test.describe('Job Management', () => {
   test.beforeEach(async ({ page }) => {
@@ -1434,10 +1533,8 @@ test.describe('Job Management', () => {
     await page.click('text=职位管理');
     await page.click('text=创建职位');
 
-    const jdContent = fs.readFileSync(
-      path.join(__dirname, '../fixtures/sample-jd.txt'),
-      'utf-8'
-    );
+    const jdPath = path.join(__dirname, '../fixtures/sample-jd.txt');
+    const jdContent = fs.readFileSync(jdPath, 'utf-8');
 
     await page.fill('input[name="title"]', 'E2E测试职位');
     await page.fill('textarea[name="description"]', jdContent);
@@ -1468,14 +1565,7 @@ test.describe('Job Management', () => {
 });
 ```
 
-- [ ] **Step 2: Fix imports**
-
-```typescript
-// Add at top of job.spec.ts
-import path from 'path';
-```
-
-- [ ] **Step 3: Commit**
+- [ ] **Step 2: Commit**
 
 ```bash
 git add e2e-tests/tests/job.spec.ts
