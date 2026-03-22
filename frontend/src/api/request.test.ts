@@ -9,6 +9,14 @@ function mockFetch(status: number, body: unknown) {
   } as Response);
 }
 
+function mockFetchNonJson(status: number) {
+  return vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+    ok: false,
+    status,
+    json: () => Promise.reject(new SyntaxError('Unexpected token <')),
+  } as unknown as Response);
+}
+
 beforeEach(() => {
   setAuthToken(null);
   setUnauthorizedHandler(null);
@@ -65,5 +73,13 @@ describe('request()', () => {
   it('throws error with message on other non-2xx', async () => {
     mockFetch(500, { code: 500, message: 'Internal server error', data: null });
     await expect(request('/api/test')).rejects.toThrow('Internal server error');
+  });
+
+  it('throws graceful error when response body is not JSON', async () => {
+    mockFetchNonJson(502);
+    const err = await request('/api/test').catch((e: unknown) => e as Error & { status?: number });
+    expect(err).toBeInstanceOf(Error);
+    expect(err.status).toBe(502);
+    expect(err.message).toMatch(/HTTP 502/);
   });
 });

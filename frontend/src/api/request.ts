@@ -32,7 +32,18 @@ export async function request<T>(
   }
 
   const response = await fetch(path, { ...init, headers });
-  const body = await response.json();
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch (e) {
+    // Non-JSON response body (e.g. proxy 502 HTML error page)
+    const cause = e instanceof Error ? e.message : String(e);
+    const err: Error & { status?: number } = new Error(
+      `HTTP ${response.status}${cause ? ` (${cause})` : ''}`
+    );
+    err.status = response.status;
+    throw err;
+  }
 
   if (response.ok) {
     return body.data as T;
