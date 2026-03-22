@@ -109,6 +109,7 @@
 ├── certs/                    # Let's Encrypt 证书
 └── scripts/
     ├── deploy.sh             # 通用部署脚本
+    ├── rollback.sh           # 回滚脚本
     └── health-check.sh       # 健康检查
 ```
 
@@ -205,6 +206,10 @@ on:
   push:
     branches: ['feature/*']
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}
+
 jobs:
   ci:
     uses: ./.github/workflows/ci.yml
@@ -212,10 +217,52 @@ jobs:
   build-and-push:
     needs: ci
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
     steps:
       - uses: actions/checkout@v4
-      - name: Build and push Docker images
-        # ... 构建并推送到 ghcr.io
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        run: |
+          echo "tags=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/ai-hiring:${{ github.sha }}" >> $GITHUB_OUTPUT
+
+      - name: Build and push Backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./ai-hiring-backend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/ai-hiring-backend:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/ai-hiring-backend:dev-latest
+
+      - name: Build and push AI Service image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./ai-matching-service
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/ai-matching-service:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/ai-matching-service:dev-latest
+
+      - name: Build and push Frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/ai-hiring-frontend:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/ai-hiring-frontend:dev-latest
 
   deploy:
     needs: build-and-push
@@ -228,7 +275,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-            /opt/ai-hiring/scripts/deploy.sh dev
+            /opt/ai-hiring/scripts/deploy.sh dev ${{ github.sha }}
 
   e2e:
     needs: deploy
@@ -247,7 +294,77 @@ jobs:
 
 ### Deploy Staging Workflow (deploy-staging.yml)
 
-与 Dev 类似，触发条件为 `push to master`。
+```yaml
+name: Deploy Staging
+
+on:
+  push:
+    branches: [master]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  build-and-push:
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./ai-hiring-backend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/ai-hiring-backend:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/ai-hiring-backend:staging-latest
+
+      - name: Build and push AI Service image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./ai-matching-service
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/ai-matching-service:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/ai-matching-service:staging-latest
+
+      - name: Build and push Frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/ai-hiring-frontend:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/ai-hiring-frontend:staging-latest
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            /opt/ai-hiring/scripts/deploy.sh staging ${{ github.sha }}
+```
 
 ### Deploy Prod Workflow (deploy-prod.yml)
 
@@ -258,11 +375,24 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to deploy (e.g., v1.0.0)'
+        description: 'Git commit SHA to deploy'
         required: true
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}
+
 jobs:
+  pull-images:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify image exists
+        run: |
+          # 验证指定版本的镜像存在
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/ai-hiring-backend:${{ inputs.version }}
+
   deploy:
+    needs: pull-images
     runs-on: ubuntu-latest
     steps:
       - name: Deploy to Production
@@ -272,7 +402,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-            /opt/ai-hiring/scripts/deploy.sh prod
+            /opt/ai-hiring/scripts/deploy.sh prod ${{ inputs.version }}
 ```
 
 ## Nginx 配置
@@ -358,15 +488,22 @@ server {
 set -e
 
 ENV=$1
+VERSION=$2
 
 if [ -z "$ENV" ]; then
-    echo "Usage: $0 <dev|staging|prod>"
+    echo "Usage: $0 <dev|staging|prod> [version]"
     exit 1
 fi
 
 cd /opt/ai-hiring/docker/$ENV
 
 echo "🚀 Deploying $ENV environment..."
+
+# 如果指定了版本，更新 .env 中的镜像标签
+if [ -n "$VERSION" ]; then
+    sed -i "s/IMAGE_TAG=.*/IMAGE_TAG=$VERSION/" .env
+    echo "📦 Using image tag: $VERSION"
+fi
 
 # 拉取最新镜像
 docker compose pull
@@ -382,6 +519,26 @@ sleep 10
 /opt/ai-hiring/scripts/health-check.sh $ENV
 
 echo "✅ $ENV deployment complete!"
+```
+
+### rollback.sh
+
+```bash
+#!/bin/bash
+set -e
+
+ENV=$1
+VERSION=$2
+
+if [ -z "$ENV" ] || [ -z "$VERSION" ]; then
+    echo "Usage: $0 <dev|staging|prod> <version>"
+    echo "Example: $0 prod abc123def456"
+    exit 1
+fi
+
+echo "🔄 Rolling back $ENV to version $VERSION..."
+/opt/ai-hiring/scripts/deploy.sh $ENV $VERSION
+echo "✅ Rollback complete!"
 ```
 
 ### health-check.sh
@@ -469,6 +626,52 @@ export default defineConfig({
 
 - `sample-resume.pdf` — 真实简历样例（脱敏）
 - `sample-jd.txt` — 真实 JD 样例
+
+### 测试数据清理策略
+
+每次 E2E 测试运行后自动清理测试数据：
+
+```typescript
+// tests/setup.ts
+import { test as setup } from '@playwright/test';
+
+setup('cleanup test data', async ({ request }) => {
+  // 使用测试账号登录后清理该账号创建的数据
+  await request.post('/api/test/cleanup', {
+    headers: { 'X-Test-Secret': process.env.TEST_SECRET }
+  });
+});
+```
+
+后端提供测试专用清理接口（仅在非生产环境启用）：
+
+```java
+@RestController
+@RequestMapping("/api/test")
+@Profile({"dev", "staging"})
+public class TestCleanupController {
+    @PostMapping("/cleanup")
+    public void cleanup(@RequestHeader("X-Test-Secret") String secret) {
+        // 验证密钥后清理测试数据
+    }
+}
+```
+
+## 数据库迁移策略
+
+使用 Flyway 管理 Schema 迁移（项目已集成）：
+
+| 环境 | 迁移时机 | 说明 |
+|------|----------|------|
+| Dev | 容器启动时自动 | Spring Boot `spring.flyway.enabled=true` |
+| Staging | 容器启动时自动 | 同 Dev |
+| Production | 容器启动时自动 | Flyway 保证迁移幂等性 |
+
+迁移文件位置：`ai-hiring-backend/src/main/resources/db/migration/`
+
+**回滚注意：** Flyway 不支持自动回滚。如需回滚 Schema：
+1. 创建新的迁移文件（V{version}__rollback_xxx.sql）
+2. 或手动执行 SQL 修复
 
 ## GitHub Secrets
 
