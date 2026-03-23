@@ -48,13 +48,13 @@ public class Resume extends BaseEntity {
     @Column(name = "candidate_email", length = 100)
     private String candidateEmail;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "jsonb")
     private String education;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "jsonb")
     private String experience;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "jsonb")
     private String projects;
 
     @Column(columnDefinition = "jsonb")
