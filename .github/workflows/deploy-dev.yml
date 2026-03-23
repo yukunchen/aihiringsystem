@@ -62,6 +62,8 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     steps:
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1
@@ -69,7 +71,9 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          envs: OPENAI_API_KEY
           script: |
+            export OPENAI_API_KEY="$OPENAI_API_KEY"
             /opt/ai-hiring/scripts/deploy.sh dev ${{ github.sha }}
 
   e2e:
@@ -93,8 +97,9 @@ jobs:
         working-directory: e2e-tests
         run: npx playwright test --project=chromium
         env:
-          BASE_URL: https://dev.${{ secrets.DOMAIN }}
-          TEST_SECRET: ${{ secrets.TEST_SECRET }}
+          BASE_URL: http://${{ secrets.VPS_HOST }}:3001
+          TEST_USERNAME: ${{ secrets.TEST_USERNAME }}
+          TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
