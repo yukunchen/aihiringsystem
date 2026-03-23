@@ -9,21 +9,27 @@ services:
     environment:
       - VITE_API_BASE_URL=/api
     restart: unless-stopped
+    networks:
+      - ai-hiring-network
   backend:
     image: ${REGISTRY}/${IMAGE_PREFIX}/ai-hiring-backend:${IMAGE_TAG}
     ports:
       - "${BACKEND_PORT}:8080"
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
-      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
-      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
-      - AI_MATCHING_URL=http://ai-matching:8001
-      - MINIO_ENDPOINT=http://${MINIO_HOST}:${MINIO_PORT}
+      - DB_URL=jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+      - DB_USERNAME=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_DRIVER=org.postgresql.Driver
+      - AI_MATCHING_BASE_URL=http://ai-matching:8001
       - JWT_SECRET=${JWT_SECRET}
       - SPRING_PROFILES_ACTIVE=dev
+      - SPRING_FLYWAY_ENABLED=true
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=validate
     depends_on:
       - ai-matching
     restart: unless-stopped
+    networks:
+      - ai-hiring-network
   ai-matching:
     image: ${REGISTRY}/${IMAGE_PREFIX}/ai-matching-service:${IMAGE_TAG}
     ports:
@@ -35,3 +41,9 @@ services:
       - QDRANT_HOST=${QDRANT_HOST}
       - QDRANT_PORT=${QDRANT_PORT}
     restart: unless-stopped
+    networks:
+      - ai-hiring-network
+
+networks:
+  ai-hiring-network:
+    external: true
