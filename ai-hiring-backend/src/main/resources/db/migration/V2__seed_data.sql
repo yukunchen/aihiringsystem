@@ -67,7 +67,7 @@ INSERT INTO departments (id, name, parent_id) VALUES
 
 -- Default Admin User (password: admin123, BCrypt hashed)
 INSERT INTO users (id, username, password, email, enabled, department_id) VALUES
-    ('04000000-0000-0000-0000-000000000001', 'admin', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZRGdjGj/n3.rsW4WzOFbMB3dHI.Hu', 'admin@aihiring.com', TRUE, '03000000-0000-0000-0000-000000000001');
+    ('04000000-0000-0000-0000-000000000001', 'admin', '$2b$10$2.XH3s1y/poUx1BCv4SfPuy5dTKZWynWcIDoo/Ihk8HI64K/fuYC6', 'admin@aihiring.com', TRUE, '03000000-0000-0000-0000-000000000001');
 
 -- Assign admin to SUPER_ADMIN role
 INSERT INTO user_roles (user_id, role_id) VALUES

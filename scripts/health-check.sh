@@ -25,12 +25,14 @@ esac
 
 echo "🔍 Health check for $ENV environment..."
 
-# Check backend (using login endpoint since it's always public)
+# Check backend (any response means it's running)
 echo "  Checking backend on port $BACKEND_PORT..."
-if curl -sf "http://localhost:$BACKEND_PORT/api/auth/login" -X POST -H "Content-Type: application/json" -d '{}' > /dev/null 2>&1; then
-    echo "  ✅ Backend healthy (login endpoint reachable)"
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$BACKEND_PORT/api/auth/login" -X POST -H "Content-Type: application/json" -d '{}' 2>&1)
+
+if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 500 ]; then
+    echo "  ✅ Backend healthy (HTTP $HTTP_CODE)"
 else
-    echo "  ❌ Backend health check failed"
+    echo "  ❌ Backend health check failed (HTTP $HTTP_CODE)"
     exit 1
 fi
 
