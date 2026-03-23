@@ -37,7 +37,7 @@ docker compose up -d --no-deps
 
 # Wait for startup
 echo "⏳ Waiting for services to start..."
-sleep 30
+sleep 45
 
 # Health check
 "$SCRIPT_DIR/health-check.sh" "$ENV"

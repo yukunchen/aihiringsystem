@@ -42,6 +42,6 @@ jobs:
             /opt/ai-hiring/scripts/deploy.sh prod ${{ inputs.version }} "$GHCR_TOKEN"
       - name: Health check
         run: |
-          sleep 30
+          sleep 45
           curl -sf http://${{ secrets.VPS_HOST }}:8080/api/auth/login -X POST -H "Content-Type: application/json" -d '{}' || exit 1
           echo "Production deployment successful"
