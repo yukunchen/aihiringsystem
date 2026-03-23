@@ -8,7 +8,7 @@ class MockResizeObserver {
   unobserve = vi.fn();
   disconnect = vi.fn();
 }
-global.ResizeObserver = MockResizeObserver as any;
+global.ResizeObserver = MockResizeObserver as typeof ResizeObserver;
 
 vi.mock('../../api/resumes', () => ({
   listResumes: vi.fn(),

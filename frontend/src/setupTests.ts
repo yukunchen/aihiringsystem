@@ -21,7 +21,7 @@ class ResizeObserverMock {
   disconnect = vi.fn();
 }
 
-global.ResizeObserver = ResizeObserverMock as any;
+global.ResizeObserver = ResizeObserverMock as typeof ResizeObserver;
 
 afterEach(() => {
   vi.restoreAllMocks();
