@@ -1,0 +1,41 @@
+name: Deploy Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Git commit SHA to deploy'
+        required: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify images exist
+        run: |
+          echo "Verifying images for version ${{ inputs.version }}"
+          echo "Backend: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/ai-hiring-backend:${{ inputs.version }}"
+          echo "AI Service: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/ai-matching-service:${{ inputs.version }}"
+          echo "Frontend: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/ai-hiring-frontend:${{ inputs.version }}"
+
+  deploy:
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deploy to Production
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            /opt/ai-hiring/scripts/deploy.sh prod ${{ inputs.version }}
+      - name: Health check
+        run: |
+          curl -sf https://${{ secrets.DOMAIN }}/api/actuator/health || exit 1
+          echo "Production deployment successful"

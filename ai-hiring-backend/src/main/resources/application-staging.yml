@@ -1,0 +1,24 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/aihiring_staging}
+    username: ${DB_USERNAME:aihiring}
+    password: ${DB_PASSWORD:aihiring}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+  server:
+    address: 0.0.0.0
+
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration: 7200000
+  refresh-token-expiration: 604800000
+
+admin:
+  default-password: ${ADMIN_DEFAULT_PASSWORD}
+
+test:
+  secret: ${TEST_SECRET:}

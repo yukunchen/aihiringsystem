@@ -17,6 +17,11 @@ interface RequestOptions {
   skipAuthHandler?: boolean;
 }
 
+interface ApiResponse<T = unknown> {
+  data?: T;
+  message?: string;
+}
+
 export async function request<T>(
   path: string,
   init: RequestInit = {},
@@ -32,7 +37,7 @@ export async function request<T>(
   }
 
   const response = await fetch(path, { ...init, headers });
-  let body: unknown;
+  let body: ApiResponse;
   try {
     body = await response.json();
   } catch (e) {
