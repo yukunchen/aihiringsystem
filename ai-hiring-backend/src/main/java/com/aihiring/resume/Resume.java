@@ -57,6 +57,6 @@ public class Resume extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String projects;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "jsonb")
     private String skills;
 }
