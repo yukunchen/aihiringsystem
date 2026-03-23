@@ -22,7 +22,7 @@ public class JobDescription extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String requirements;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "jsonb")
     private String skills;
 
     @Column(length = 50)
