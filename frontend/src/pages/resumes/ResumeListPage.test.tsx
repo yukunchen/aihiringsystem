@@ -47,6 +47,11 @@ describe('ResumeListPage', () => {
     await waitFor(() => expect(screen.getByText(/No resumes yet/i)).toBeInTheDocument());
   });
 
+  it('should show batch upload button', () => {
+    render(<MemoryRouter><ResumeListPage /></MemoryRouter>);
+    expect(screen.getByText('Batch Upload')).toBeInTheDocument();
+  });
+
   it('calls deleteResume on confirm delete', async () => {
     vi.mocked(resumesApi.deleteResume).mockResolvedValueOnce(undefined);
     vi.mocked(resumesApi.listResumes).mockResolvedValue(mockPage);

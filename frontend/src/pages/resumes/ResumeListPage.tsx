@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Table, Button, Tag, Popconfirm, Space, message, Empty } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { listResumes, deleteResume, downloadResume, type ResumeListItem, type Page } from '../../api/resumes';
+import { BatchUploadModal } from './BatchUploadModal';
 
 const STATUS_COLORS: Record<string, string> = {
   UPLOADED: 'default', PARSING: 'processing', PARSED: 'success',
@@ -13,6 +14,12 @@ export default function ResumeListPage() {
   const [page, setPage] = useState<Page<ResumeListItem> | null>(null);
   const [loading, setLoading] = useState(false);
   const [current, setCurrent] = useState(1);
+  const [batchModalOpen, setBatchModalOpen] = useState(false);
+
+  const handleBatchSuccess = () => {
+    load(current);
+    setBatchModalOpen(false);
+  };
 
   const load = async (p: number) => {
     setLoading(true);
@@ -78,6 +85,7 @@ export default function ResumeListPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <h2 style={{ margin: 0 }}>Resumes</h2>
         <Button type="primary" onClick={() => navigate('/resumes/upload')}>Upload Resume</Button>
+        <Button onClick={() => setBatchModalOpen(true)} style={{ marginLeft: 8 }}>Batch Upload</Button>
       </div>
       {isEmpty ? (
         <Empty description="No resumes yet. Upload your first resume to get started." />
@@ -93,6 +101,11 @@ export default function ResumeListPage() {
           }}
         />
       )}
+      <BatchUploadModal
+        open={batchModalOpen}
+        onClose={() => setBatchModalOpen(false)}
+        onSuccess={handleBatchSuccess}
+      />
     </div>
   );
 }
