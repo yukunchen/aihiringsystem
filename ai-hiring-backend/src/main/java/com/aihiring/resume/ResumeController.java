@@ -83,7 +83,7 @@ public class ResumeController {
             MultipartFile file = files[i];
             try {
                 Resume resume = resumeService.uploadSingle(file, source, currentUser.getId());
-                results.add(new BatchUploadResult(i, file.getOriginalFilename(), "TEXT_EXTRACTED", resume.getId(), null));
+                results.add(new BatchUploadResult(i, file.getOriginalFilename(), resume.getStatus().name(), resume.getId(), null));
             } catch (BusinessException e) {
                 results.add(new BatchUploadResult(i, file.getOriginalFilename(), "FAILED", null, e.getMessage()));
             } catch (Exception e) {

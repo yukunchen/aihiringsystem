@@ -21,6 +21,8 @@ import java.util.stream.IntStream;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
+
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -222,34 +224,34 @@ class ResumeControllerIntegrationTest {
 
     @Test
     void upload_withExceeds100Files_shouldReturn400() throws Exception {
-        // Verify batch size limit is enforced - 101 files exceeds 100 limit
-        // Note: MockMvc file() API only accepts varargs, not arrays, so we verify
-        // the limit logic by checking the controller rejects oversized batches
-        MockMultipartFile file1 = new MockMultipartFile("files", "f1.txt", "text/plain", "c1".getBytes());
-        MockMultipartFile file2 = new MockMultipartFile("files", "f2.txt", "text/plain", "c2".getBytes());
+        // Create 101 files (exceeds 100 limit)
+        List<MockMultipartFile> files = IntStream.range(0, 101)
+                .mapToObj(i -> new MockMultipartFile("files", "resume" + i + ".txt", "text/plain", ("content" + i).getBytes()))
+                .collect(Collectors.toList());
 
-        // With 2 files it should succeed (under 100 limit)
-        mockMvc.perform(multipart("/api/resumes/upload")
-                .file(file1)
-                .file(file2)
-                .with(adminUser()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.total").value(2));
+        MockMultipartHttpServletRequestBuilder builder = multipart("/api/resumes/upload");
+        for (MockMultipartFile file : files) {
+            builder.file(file);
+        }
+        mockMvc.perform(builder.with(adminUser()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400));
     }
 
     @Test
     void upload_withTotalSizeExceeds200MB_shouldReturn400() throws Exception {
-        // Verify total size limit is enforced
-        // A single request cannot easily test 200MB via MockMvc, so we verify
-        // the controller's size validation logic with smaller files
-        MockMultipartFile normalFile = new MockMultipartFile("files", "normal.txt", "text/plain", "normal content".getBytes());
+        // Create 201 files at 1MB each = 201MB (exceeds 200MB limit)
+        List<MockMultipartFile> files = IntStream.range(0, 201)
+                .mapToObj(i -> new MockMultipartFile("files", "resume" + i + ".txt", "text/plain", new byte[1024 * 1024]))
+                .collect(Collectors.toList());
 
-        // With normal sized files it should succeed
-        mockMvc.perform(multipart("/api/resumes/upload")
-                .file(normalFile)
-                .with(adminUser()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200));
+        MockMultipartHttpServletRequestBuilder builder = multipart("/api/resumes/upload");
+        for (MockMultipartFile file : files) {
+            builder.file(file);
+        }
+        mockMvc.perform(builder.with(adminUser()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400));
     }
 
     @Test
