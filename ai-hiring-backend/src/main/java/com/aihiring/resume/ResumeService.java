@@ -44,6 +44,8 @@ public class ResumeService {
         "text/plain"
     );
 
+    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
     private static final Map<String, String> TYPE_EXTENSIONS = Map.of(
         "application/pdf", "pdf",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx",
@@ -134,6 +136,9 @@ public class ResumeService {
         }
         if (!ALLOWED_TYPES.contains(file.getContentType())) {
             throw new BusinessException(400, "Unsupported file type. Allowed: PDF, DOCX, TXT");
+        }
+        if (file.getSize() > MAX_FILE_SIZE) {
+            throw new BusinessException(400, "File size exceeds 10MB limit");
         }
     }
 
