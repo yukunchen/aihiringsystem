@@ -14,7 +14,7 @@ public class BatchUploadResponse {
     public BatchUploadResponse(List<BatchUploadResult> results) {
         this.results = results;
         this.total = results.size();
-        this.succeeded = (int) results.stream().filter(r -> "UPLOADED".equals(r.getStatus())).count();
-        this.failed = (int) results.stream().filter(r -> "FAILED".equals(r.getStatus())).count();
+        this.succeeded = (int) results.stream().filter(r -> r != null && "UPLOADED".equals(r.getStatus())).count();
+        this.failed = (int) results.stream().filter(r -> r != null && "FAILED".equals(r.getStatus())).count();
     }
 }
