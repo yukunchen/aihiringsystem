@@ -14,9 +14,13 @@
 
 **Endpoint**: `POST /api/resumes/upload`
 
-**变更**: 参数从 `MultipartFile file` 改为 `MultipartFile[] files`
+**Request**: `multipart/form-data`
 
-**Request**: `multipart/form-data`，字段名 `files`（数组）
+**参数**（二选一）:
+- `files` (MultipartFile[]): 批量上传，数组
+- `file` (MultipartFile): 兼容现有单文件上传
+
+同时传入 `source` (ResumeSource, 默认 MANUAL) 和 `uploadedByUserId` (UUID, 必填)。
 
 **Response** (`BatchUploadResponse`):
 ```json
@@ -26,11 +30,13 @@
   "failed": 1,
   "results": [
     {
+      "originalIndex": 0,
       "fileName": "resume1.pdf",
       "status": "UPLOADED",
       "resumeId": 101
     },
     {
+      "originalIndex": 1,
       "fileName": "resume2.pdf",
       "status": "FAILED",
       "error": "不支持的文件类型"
@@ -39,9 +45,16 @@
 }
 ```
 
+其中 `BatchUploadResult`:
+- `originalIndex`: 原始文件顺序（从0开始），用于关联
+- `fileName`: 原始文件名
+- `status`: `UPLOADED` | `FAILED`
+- `resumeId`: 成功时返回的简历ID
+- `error`: 失败时返回的错误信息
+
 **状态码**:
 - `200`: 所有文件处理完成（部分成功也返回200）
-- `400`: 请求格式错误（如无文件）
+- `400`: 无文件（`files` 为空或 null）或批量超限
 
 ### 3.2 前端 API
 
@@ -53,29 +66,35 @@
 
 ```java
 @PostMapping("/upload")
-public ResponseEntity<BatchUploadResponse> upload(
-    @RequestParam("files") MultipartFile[] files,
-    @RequestParam(value = "source", defaultValue = "MANUAL") ResumeSource source)
+public ResponseEntity<ApiResponse<BatchUploadResponse>> upload(
+    @RequestParam(value = "files", required = false) MultipartFile[] files,
+    @RequestParam(value = "file", required = false) MultipartFile singleFile,
+    @RequestParam(value = "source", defaultValue = "MANUAL") ResumeSource source,
+    @RequestParam UUID uploadedByUserId)
 ```
 
-遍历 `files`，对每份独立调用 `resumeService.uploadSingle(file, source)`，捕获异常并记录。
+逻辑：
+1. 空数组或 null → 返回 400
+2. `files != null` → 批量处理（校验100份和200MB限制）
+3. `files == null && singleFile != null` → 兼容单文件（调用 uploadSingle）
+4. `files == null && singleFile == null` → 返回 400
 
 ### 4.2 ResumeService
 
-新增 `uploadSingle(MultipartFile file, ResumeSource source)` 方法（提取自原有 `upload`），每份简历独立处理：
-1. 校验文件（类型、大小）
+新增 `uploadSingle(MultipartFile file, ResumeSource source, UUID uploadedByUserId)` 方法（提取自原有 `upload`），每份简历独立处理：
+1. 校验文件（类型、**10MB大小**）
 2. 存储文件
 3. 提取文本
 4. 发布 `ResumeUploadedEvent`
 5. 返回结果或捕获异常
 
-原有 `upload()` 方法改为调用 `uploadSingle` 循环处理数组。
+**事务边界**: `uploadSingle` 为独立事务，部分成功部分失败时已成功的不回滚。
 
 ### 4.3 批量限制
 
-- 单文件大小: ≤ 10MB（保持不变）
-- 批量总文件数: ≤ 100份
-- 批量总大小: ≤ 200MB
+- 单文件大小: ≤ 10MB（`validateFile()` 内校验）
+- 批量总文件数: ≤ 100份（Controller 校验，返回400）
+- 批量总大小: ≤ 200MB（Controller 校验，返回400）
 
 ## 5. 前端实现
 
@@ -110,10 +129,17 @@ public ResponseEntity<BatchUploadResponse> upload(
 
 ## 7. 向后兼容
 
-- 现有单文件上传 `POST /api/resumes/upload`（单文件）仍然正常工作
-- 现有 `ResumeUploadPage` 保持不变
+- **单文件**: 现有调用方使用 `file` 参数上传单文件，Controller 兼容处理
+- 现有 `ResumeUploadPage` 保持不变（仍使用 `file` 参数）
+- **批量**: 新版前端调用使用 `files` 参数（数组）
 
-## 8. 测试计划
+## 8. DTO 定义
+
+新建 `BatchUploadResponse` 和 `BatchUploadResult`：
+- `ai-hiring-backend/src/main/java/com/aihiring/resume/dto/BatchUploadResponse.java`
+- `ai-hiring-backend/src/main/java/com/aihiring/resume/dto/BatchUploadResult.java`
+
+## 9. 测试计划
 
 ### 8.1 单元测试
 
