@@ -46,6 +46,25 @@ class ResumeServiceTest {
     private ResumeService resumeService;
 
     @Test
+    void uploadSingle_withValidFile_shouldReturnResume() throws IOException {
+        MockMultipartFile file = new MockMultipartFile("file", "resume.pdf", "application/pdf", "pdf bytes".getBytes());
+        UUID userId = UUID.randomUUID();
+        User user = new User(); user.setId(userId); user.setUsername("admin");
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(fileStorageService.store(eq(file), any(String.class))).thenReturn("/uploads/resumes/uuid.pdf");
+        when(pdfTextExtractor.extract(any())).thenReturn("John Smith");
+        when(resumeRepository.save(any(Resume.class))).thenAnswer(i -> { Resume r = i.getArgument(0); r.setId(UUID.randomUUID()); return r; });
+
+        Resume result = resumeService.uploadSingle(file, ResumeSource.MANUAL, userId);
+
+        assertNotNull(result);
+        assertEquals("resume.pdf", result.getFileName());
+        assertEquals(ResumeStatus.TEXT_EXTRACTED, result.getStatus());
+        verify(eventPublisher).publishEvent(any(ResumeUploadedEvent.class));
+    }
+
+    @Test
     void upload_withPdf_shouldStoreExtractTextAndSave() throws IOException {
         MockMultipartFile file = new MockMultipartFile("file", "resume.pdf", "application/pdf", "pdf bytes".getBytes());
         UUID userId = UUID.randomUUID();
