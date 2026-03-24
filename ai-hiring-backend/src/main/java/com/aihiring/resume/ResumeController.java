@@ -44,7 +44,7 @@ public class ResumeController {
             @RequestParam(value = "files", required = false) MultipartFile[] files,
             @RequestParam(value = "file", required = false) MultipartFile singleFile,
             @RequestParam(value = "source", defaultValue = "MANUAL") ResumeSource source,
-            @AuthenticationPrincipal UserDetailsImpl currentUser) throws IOException {
+            @AuthenticationPrincipal UserDetailsImpl currentUser) {
 
         // Handle single file backward compat (existing 'file' param)
         if (files == null || files.length == 0) {
@@ -74,6 +74,10 @@ public class ResumeController {
             } catch (BusinessException e) {
                 return ResponseEntity.badRequest()
                     .body(ApiResponse.error(400, e.getMessage()));
+            } catch (IOException e) {
+                log.error("File upload error", e);
+                return ResponseEntity.status(500)
+                    .body(ApiResponse.error(500, "File upload failed: " + e.getMessage()));
             }
         }
 
