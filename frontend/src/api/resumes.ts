@@ -56,3 +56,34 @@ export async function downloadResume(id: string): Promise<Blob> {
 export async function deleteResume(id: string): Promise<void> {
   return request<void>(`/api/resumes/${id}`, { method: 'DELETE' });
 }
+
+export interface BatchUploadResult {
+  originalIndex: number;
+  fileName: string;
+  status: string;
+  resumeId: string | null;
+  error: string | null;
+}
+
+export interface BatchUploadResponse {
+  total: number;
+  succeeded: number;
+  failed: number;
+  results: BatchUploadResult[];
+}
+
+export async function uploadResumes(files: File[]): Promise<BatchUploadResponse> {
+  const formData = new FormData();
+  files.forEach((file) => formData.append('files', file));
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const response = await fetch('/api/resumes/upload?source=MANUAL', {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+  const body = await response.json();
+  if (response.ok) return body.data;
+  throw new Error(body.message ?? `HTTP ${response.status}`);
+}
