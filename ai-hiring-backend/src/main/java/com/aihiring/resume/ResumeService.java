@@ -53,7 +53,7 @@ public class ResumeService {
     );
 
     @Transactional
-    public Resume upload(MultipartFile file, ResumeSource source, UUID uploadedByUserId) throws IOException {
+    public Resume uploadSingle(MultipartFile file, ResumeSource source, UUID uploadedByUserId) throws IOException {
         validateFile(file);
 
         var user = userRepository.findById(uploadedByUserId)
@@ -86,6 +86,11 @@ public class ResumeService {
         resume = resumeRepository.save(resume);
         eventPublisher.publishEvent(new ResumeUploadedEvent(this, resume.getId(), rawText, file.getContentType()));
         return resume;
+    }
+
+    @Transactional
+    public Resume upload(MultipartFile file, ResumeSource source, UUID uploadedByUserId) throws IOException {
+        return uploadSingle(file, source, uploadedByUserId);
     }
 
     public Resume getById(UUID id) {
