@@ -17,6 +17,11 @@ interface RequestOptions {
   skipAuthHandler?: boolean;
 }
 
+interface ApiResponse {
+  data?: unknown;
+  message?: string;
+}
+
 export async function request<T>(
   path: string,
   init: RequestInit = {},
@@ -32,9 +37,9 @@ export async function request<T>(
   }
 
   const response = await fetch(path, { ...init, headers });
-  let body: unknown;
+  let body: ApiResponse;
   try {
-    body = await response.json();
+    body = await response.json() as ApiResponse;
   } catch (e) {
     // Non-JSON response body (e.g. proxy 502 HTML error page)
     const cause = e instanceof Error ? e.message : String(e);
