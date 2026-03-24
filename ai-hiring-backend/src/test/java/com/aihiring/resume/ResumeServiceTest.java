@@ -98,6 +98,16 @@ class ResumeServiceTest {
     }
 
     @Test
+    void upload_withFileOver10MB_shouldThrowBusinessException() {
+        byte[] bigContent = new byte[11 * 1024 * 1024]; // 11MB
+        MockMultipartFile file = new MockMultipartFile("file", "big.pdf", "application/pdf", bigContent);
+        BusinessException ex = assertThrows(BusinessException.class,
+            () -> resumeService.upload(file, ResumeSource.MANUAL, UUID.randomUUID()));
+        assertEquals(400, ex.getCode());
+        assertTrue(ex.getMessage().contains("10MB"));
+    }
+
+    @Test
     void getById_shouldReturnResume() {
         UUID id = UUID.randomUUID();
         Resume resume = new Resume(); resume.setId(id);
