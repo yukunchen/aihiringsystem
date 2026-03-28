@@ -6,6 +6,10 @@ import com.aihiring.user.User;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcType;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.dialect.PostgreSQLEnumJdbcType;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "job_descriptions")
@@ -22,6 +26,7 @@ public class JobDescription extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String requirements;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private String skills;
 
@@ -38,7 +43,8 @@ public class JobDescription extends BaseEntity {
     private String location;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @JdbcType(PostgreSQLEnumJdbcType.class)
+    @Column(nullable = false)
     private JobStatus status = JobStatus.DRAFT;
 
     @ManyToOne(fetch = FetchType.LAZY)
