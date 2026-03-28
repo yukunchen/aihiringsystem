@@ -3,9 +3,10 @@ set -e
 
 ENV=$1
 VERSION=$2
+GHCR_TOKEN=$3
 
 if [ -z "$ENV" ]; then
-    echo "Usage: $0 <dev|staging|prod> [version]"
+    echo "Usage: $0 <dev|staging|prod> [version] [ghcr_token]"
     exit 1
 fi
 
@@ -27,6 +28,12 @@ if [ -n "$VERSION" ]; then
     fi
 fi
 
+# Login to GHCR if token provided
+if [ -n "$GHCR_TOKEN" ]; then
+    echo "🔑 Logging in to GitHub Container Registry..."
+    echo "$GHCR_TOKEN" | docker login ghcr.io -u yukunchen --password-stdin
+fi
+
 # Pull latest images
 echo "📥 Pulling latest images..."
 docker compose pull
@@ -35,9 +42,22 @@ docker compose pull
 echo "🔄 Starting containers..."
 docker compose up -d --no-deps
 
-# Wait for startup
-echo "⏳ Waiting for services to start..."
-sleep 45
+# Wait for backend to be ready (polls up to 5 minutes)
+echo "⏳ Waiting for backend to be ready..."
+BACKEND_PORT=$(grep "BACKEND_PORT=" "$COMPOSE_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "8080")
+TIMEOUT=300
+ELAPSED=0
+until curl -sf -o /dev/null -w "%{http_code}" "http://localhost:${BACKEND_PORT}/api/auth/login" \
+    -X POST -H "Content-Type: application/json" -d '{}' 2>/dev/null | grep -qE "^[234]"; do
+    if [ $ELAPSED -ge $TIMEOUT ]; then
+        echo "❌ Backend did not become ready within ${TIMEOUT}s"
+        exit 1
+    fi
+    sleep 10
+    ELAPSED=$((ELAPSED + 10))
+    echo "  ... still waiting (${ELAPSED}s)"
+done
+echo "✅ Backend ready after ${ELAPSED}s"
 
 # Health check
 "$SCRIPT_DIR/health-check.sh" "$ENV"
