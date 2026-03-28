@@ -98,6 +98,13 @@ class ResumeServiceTest {
     }
 
     @Test
+    void upload_withDocType_shouldThrowBusinessException() {
+        // .doc files (application/msword) are not supported; only PDF, DOCX, and TXT are allowed
+        MockMultipartFile file = new MockMultipartFile("file", "resume.doc", "application/msword", "doc bytes".getBytes());
+        assertThrows(BusinessException.class, () -> resumeService.upload(file, ResumeSource.MANUAL, UUID.randomUUID()));
+    }
+
+    @Test
     void getById_shouldReturnResume() {
         UUID id = UUID.randomUUID();
         Resume resume = new Resume(); resume.setId(id);

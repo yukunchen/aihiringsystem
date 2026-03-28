@@ -4,7 +4,7 @@ import { InboxOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { uploadResume } from '../../api/resumes';
 
-const ACCEPTED = '.pdf,.doc,.docx';
+const ACCEPTED = '.pdf,.docx,.txt';
 
 export default function ResumeUploadPage() {
   const navigate = useNavigate();
@@ -40,7 +40,7 @@ export default function ResumeUploadPage() {
       >
         <p className="ant-upload-drag-icon"><InboxOutlined /></p>
         <p className="ant-upload-text">Click or drag a resume file to this area to upload</p>
-        <p className="ant-upload-hint">Supports PDF, DOC, DOCX</p>
+        <p className="ant-upload-hint">Supports PDF, DOCX, TXT</p>
       </Upload.Dragger>
       <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
         <Button type="primary" disabled={!file} loading={loading} onClick={handleUpload} data-testid="upload-btn">
