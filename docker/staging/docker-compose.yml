@@ -21,6 +21,7 @@ services:
       - MINIO_ENDPOINT=http://${MINIO_HOST}:${MINIO_PORT}
       - JWT_SECRET=${JWT_SECRET}
       - SPRING_PROFILES_ACTIVE=staging
+      - JAVA_OPTS=-XX:TieredStopAtLevel=1 -Xms256m -Xmx512m
     depends_on:
       - ai-matching
     restart: unless-stopped
