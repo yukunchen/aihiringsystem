@@ -45,7 +45,7 @@ docker compose up -d --no-deps
 # Wait for backend to be ready (polls up to 5 minutes)
 echo "⏳ Waiting for backend to be ready..."
 BACKEND_PORT=$(grep "BACKEND_PORT=" "$COMPOSE_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "8080")
-TIMEOUT=300
+TIMEOUT=360
 ELAPSED=0
 until curl -sf -o /dev/null -w "%{http_code}" "http://localhost:${BACKEND_PORT}/api/auth/login" \
     -X POST -H "Content-Type: application/json" -d '{}' 2>/dev/null | grep -qE "^[234]"; do
