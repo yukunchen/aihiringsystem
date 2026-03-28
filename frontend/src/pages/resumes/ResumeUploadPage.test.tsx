@@ -25,6 +25,17 @@ describe('ResumeUploadPage', () => {
     expect(screen.getByText(/drag/i)).toBeInTheDocument();
   });
 
+  it('accepts only pdf, docx, and txt file types', () => {
+    render(<MemoryRouter><ResumeUploadPage /></MemoryRouter>);
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    expect(input.accept).toBe('.pdf,.docx,.txt');
+  });
+
+  it('shows correct supported file type hint text', () => {
+    render(<MemoryRouter><ResumeUploadPage /></MemoryRouter>);
+    expect(screen.getByText(/Supports PDF, DOCX, TXT/i)).toBeInTheDocument();
+  });
+
   it('uploads file and redirects to /resumes on success', async () => {
     vi.mocked(resumesApi.uploadResume).mockResolvedValueOnce({
       id: 'r1', fileName: 'cv.pdf', fileType: 'PDF', source: 'MANUAL', status: 'UPLOADED', uploadedAt: '',
