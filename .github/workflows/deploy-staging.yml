@@ -182,3 +182,35 @@ ${DETAILS}
               --body "$BODY"
             echo "Commented on issue #$ISSUE"
           done
+
+      - name: Notify Claude Code on VPS
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: PASS,SHA,DETAILS,RUN_URL
+          script: |
+            if [ "$PASS" = "true" ]; then
+              MSG="✅ Staging Deploy Complete — commit ${SHA:0:7}"
+            else
+              MSG="❌ Staging Deploy FAILED — commit ${SHA:0:7}"
+            fi
+            python3 -c "
+            import json, datetime
+            entry = {
+              'id': '${SHA:0:7}',
+              'timestamp': datetime.datetime.utcnow().isoformat() + 'Z',
+              'read': False,
+              'message': '$MSG',
+              'details': '$DETAILS',
+              'run_url': '$RUN_URL'
+            }
+            with open('/opt/ai-hiring/notifications/queue.jsonl', 'a') as f:
+                f.write(json.dumps(entry) + '\n')
+            "
+        env:
+          PASS: ${{ steps.smoke.outputs.pass }}
+          SHA: ${{ github.sha }}
+          DETAILS: ${{ steps.smoke.outputs.details }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
