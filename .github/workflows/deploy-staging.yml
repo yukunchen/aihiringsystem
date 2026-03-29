@@ -77,3 +77,108 @@ jobs:
           script: |
             export OPENAI_API_KEY="$OPENAI_API_KEY"
             /opt/ai-hiring/scripts/deploy.sh staging ${{ github.sha }} "$GHCR_TOKEN"
+
+  verify:
+    needs: deploy
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Smoke test staging
+        id: smoke
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          BASE="http://${VPS_HOST}:8082"
+          PASS=true
+          DETAILS=""
+
+          # 1. Login
+          LOGIN=$(curl -sf -X POST "$BASE/api/auth/login" \
+            -H "Content-Type: application/json" \
+            -d '{"username":"admin","password":"admin123"}' || echo '{}')
+          TOKEN=$(echo "$LOGIN" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('data',{}).get('accessToken',''))" 2>/dev/null)
+
+          if [ -z "$TOKEN" ]; then
+            PASS=false
+            DETAILS="${DETAILS}\n- ❌ Login failed"
+          else
+            DETAILS="${DETAILS}\n- ✅ Login"
+          fi
+
+          # 2. Resume upload
+          if [ -n "$TOKEN" ]; then
+            echo "smoke test resume" > /tmp/smoke.txt
+            UPLOAD=$(curl -sf -X POST "$BASE/api/resumes/upload" \
+              -H "Authorization: Bearer $TOKEN" \
+              -F "file=@/tmp/smoke.txt;type=text/plain" || echo '{}')
+            CODE=$(echo "$UPLOAD" | python3 -c "import sys,json; print(json.load(sys.stdin).get('code',''))" 2>/dev/null)
+            if [ "$CODE" = "200" ]; then
+              DETAILS="${DETAILS}\n- ✅ Resume upload"
+            else
+              PASS=false
+              DETAILS="${DETAILS}\n- ❌ Resume upload (response: $CODE)"
+            fi
+          fi
+
+          # 3. Jobs list
+          if [ -n "$TOKEN" ]; then
+            JOBS=$(curl -sf "$BASE/api/jobs" \
+              -H "Authorization: Bearer $TOKEN" || echo '{}')
+            JCODE=$(echo "$JOBS" | python3 -c "import sys,json; print(json.load(sys.stdin).get('code',''))" 2>/dev/null)
+            if [ "$JCODE" = "200" ]; then
+              DETAILS="${DETAILS}\n- ✅ Jobs list"
+            else
+              PASS=false
+              DETAILS="${DETAILS}\n- ❌ Jobs list (response: $JCODE)"
+            fi
+          fi
+
+          echo "pass=$PASS" >> $GITHUB_OUTPUT
+          echo "details<<EOF" >> $GITHUB_OUTPUT
+          printf "$DETAILS" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Comment on linked issues
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PASS: ${{ steps.smoke.outputs.pass }}
+          DETAILS: ${{ steps.smoke.outputs.details }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+          SHA: ${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # Extract issue numbers from commit message (e.g. "closes #21", "fixes #19")
+          ISSUES=$(echo "$COMMIT_MSG" | grep -oiE '(closes?|fixes?|resolves?) #[0-9]+' | grep -oE '#[0-9]+' | tr -d '#' || true)
+
+          if [ -z "$ISSUES" ]; then
+            echo "No linked issues found in commit message, skipping comment"
+            exit 0
+          fi
+
+          if [ "$PASS" = "true" ]; then
+            ICON="✅"
+            STATUS="Staging smoke tests **passed**"
+          else
+            ICON="❌"
+            STATUS="Staging smoke tests **failed**"
+          fi
+
+          BODY="${ICON} **Staging Deploy Complete** — commit \`${SHA:0:7}\`
+
+${STATUS}
+
+**Checks:**
+${DETAILS}
+
+[View deployment run](${RUN_URL})"
+
+          for ISSUE in $ISSUES; do
+            gh issue comment "$ISSUE" \
+              --repo "${{ github.repository }}" \
+              --body "$BODY"
+            echo "Commented on issue #$ISSUE"
+          done
