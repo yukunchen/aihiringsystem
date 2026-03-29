@@ -54,6 +54,18 @@ public class DataInitializer implements CommandLineRunner {
         roleRead = permissionRepository.save(roleRead);
         Permission roleManage = new Permission(); roleManage.setName("role:manage"); roleManage.setDescription("Create/update/delete roles");
         roleManage = permissionRepository.save(roleManage);
+        Permission resumeRead = new Permission(); resumeRead.setName("resume:read"); resumeRead.setDescription("Read resumes");
+        resumeRead = permissionRepository.save(resumeRead);
+        Permission resumeManage = new Permission(); resumeManage.setName("resume:manage"); resumeManage.setDescription("Manage resumes");
+        resumeManage = permissionRepository.save(resumeManage);
+        Permission jobRead = new Permission(); jobRead.setName("job:read"); jobRead.setDescription("Read job descriptions");
+        jobRead = permissionRepository.save(jobRead);
+        Permission jobManage = new Permission(); jobManage.setName("job:manage"); jobManage.setDescription("Manage job descriptions");
+        jobManage = permissionRepository.save(jobManage);
+        Permission matchRead = new Permission(); matchRead.setName("match:read"); matchRead.setDescription("Read match results");
+        matchRead = permissionRepository.save(matchRead);
+        Permission matchExecute = new Permission(); matchExecute.setName("match:execute"); matchExecute.setDescription("Execute matching");
+        matchExecute = permissionRepository.save(matchExecute);
 
         // Create roles
         Role superAdmin = new Role(); superAdmin.setName("SUPER_ADMIN"); superAdmin.setDescription("Super Administrator");
@@ -61,14 +73,17 @@ public class DataInitializer implements CommandLineRunner {
         superAdmin = roleRepository.save(superAdmin);
 
         Role hrAdmin = new Role(); hrAdmin.setName("HR_ADMIN"); hrAdmin.setDescription("HR Administrator");
-        hrAdmin.getPermissions().addAll(Arrays.asList(userRead, userManage, deptRead, deptManage, roleRead, roleManage));
+        hrAdmin.getPermissions().addAll(Arrays.asList(userRead, userManage, deptRead, deptManage, roleRead, roleManage,
+                resumeRead, resumeManage, jobRead, jobManage, matchRead, matchExecute));
         hrAdmin = roleRepository.save(hrAdmin);
 
         Role deptAdmin = new Role(); deptAdmin.setName("DEPT_ADMIN"); deptAdmin.setDescription("Department Administrator");
-        deptAdmin.getPermissions().addAll(Arrays.asList(userRead, deptRead));
+        deptAdmin.getPermissions().addAll(Arrays.asList(userRead, deptRead,
+                resumeRead, resumeManage, jobRead, jobManage, matchRead, matchExecute));
         deptAdmin = roleRepository.save(deptAdmin);
 
         Role user = new Role(); user.setName("USER"); user.setDescription("Regular User");
+        user.getPermissions().addAll(Arrays.asList(resumeRead, jobRead, matchRead));
         user = roleRepository.save(user);
 
         roleRepository.saveAll(Arrays.asList(superAdmin, hrAdmin, deptAdmin, user));
