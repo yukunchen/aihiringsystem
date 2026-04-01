@@ -46,6 +46,25 @@ class ResumeServiceTest {
     private ResumeService resumeService;
 
     @Test
+    void uploadSingle_withValidFile_shouldReturnResume() throws IOException {
+        MockMultipartFile file = new MockMultipartFile("file", "resume.pdf", "application/pdf", "pdf bytes".getBytes());
+        UUID userId = UUID.randomUUID();
+        User user = new User(); user.setId(userId); user.setUsername("admin");
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(fileStorageService.store(eq(file), any(String.class))).thenReturn("/uploads/resumes/uuid.pdf");
+        when(pdfTextExtractor.extract(any())).thenReturn("John Smith");
+        when(resumeRepository.save(any(Resume.class))).thenAnswer(i -> { Resume r = i.getArgument(0); r.setId(UUID.randomUUID()); return r; });
+
+        Resume result = resumeService.uploadSingle(file, ResumeSource.MANUAL, userId);
+
+        assertNotNull(result);
+        assertEquals("resume.pdf", result.getFileName());
+        assertEquals(ResumeStatus.TEXT_EXTRACTED, result.getStatus());
+        verify(eventPublisher).publishEvent(any(ResumeUploadedEvent.class));
+    }
+
+    @Test
     void upload_withPdf_shouldStoreExtractTextAndSave() throws IOException {
         MockMultipartFile file = new MockMultipartFile("file", "resume.pdf", "application/pdf", "pdf bytes".getBytes());
         UUID userId = UUID.randomUUID();
@@ -102,6 +121,17 @@ class ResumeServiceTest {
         // .doc files (application/msword) are not supported; only PDF, DOCX, and TXT are allowed
         MockMultipartFile file = new MockMultipartFile("file", "resume.doc", "application/msword", "doc bytes".getBytes());
         assertThrows(BusinessException.class, () -> resumeService.upload(file, ResumeSource.MANUAL, UUID.randomUUID()));
+    }
+
+    @Test
+    void upload_withFileOver10MB_shouldThrowBusinessException() {
+        byte[] bigContent = new byte[11 * 1024 * 1024]; // 11MB
+        MockMultipartFile file = new MockMultipartFile("file", "big.pdf", "application/pdf", bigContent);
+        BusinessException ex = assertThrows(BusinessException.class,
+            () -> resumeService.upload(file, ResumeSource.MANUAL, UUID.randomUUID()));
+        assertEquals(400, ex.getCode());
+        assertTrue(ex.getMessage().contains("10MB"));
+    }
     }
 
     @Test

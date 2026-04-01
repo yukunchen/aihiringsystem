@@ -1,12 +1,16 @@
 package com.aihiring.resume;
 
 import com.aihiring.common.dto.ApiResponse;
+import com.aihiring.common.exception.BusinessException;
 import com.aihiring.common.security.UserDetailsImpl;
+import com.aihiring.resume.dto.BatchUploadResponse;
+import com.aihiring.resume.dto.BatchUploadResult;
 import com.aihiring.resume.dto.ResumeListResponse;
 import com.aihiring.resume.dto.ResumeResponse;
 import com.aihiring.resume.dto.UpdateStructuredRequest;
 import com.aihiring.resume.storage.FileStorageService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -20,8 +24,12 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/resumes")
 @RequiredArgsConstructor
@@ -32,12 +40,63 @@ public class ResumeController {
 
     @PostMapping("/upload")
     @PreAuthorize("hasAuthority('resume:manage')")
-    public ApiResponse<ResumeResponse> upload(
-            @RequestParam("file") MultipartFile file,
+    public ResponseEntity<ApiResponse<?>> upload(
+            @RequestParam(value = "files", required = false) MultipartFile[] files,
+            @RequestParam(value = "file", required = false) MultipartFile singleFile,
             @RequestParam(value = "source", defaultValue = "MANUAL") ResumeSource source,
-            @AuthenticationPrincipal UserDetailsImpl currentUser) throws IOException {
-        Resume resume = resumeService.upload(file, source, currentUser.getId());
-        return ApiResponse.success(ResumeResponse.from(resume));
+            @AuthenticationPrincipal UserDetailsImpl currentUser) {
+
+        // Handle single file backward compat (existing 'file' param)
+        if (files == null || files.length == 0) {
+            if (singleFile == null || singleFile.isEmpty()) {
+                return ResponseEntity.badRequest()
+                    .body(ApiResponse.error(400, "No file provided"));
+            }
+            files = new MultipartFile[] { singleFile };
+        }
+
+        // Batch limits validation
+        if (files.length > 100) {
+            return ResponseEntity.badRequest()
+                .body(ApiResponse.error(400, "Batch size exceeds 100 files limit"));
+        }
+        long totalSize = Arrays.stream(files).mapToLong(MultipartFile::getSize).sum();
+        if (totalSize > 200 * 1024 * 1024) {
+            return ResponseEntity.badRequest()
+                .body(ApiResponse.error(400, "Total batch size exceeds 200MB limit"));
+        }
+
+        // For single file, use original response format for backward compatibility
+        if (files.length == 1) {
+            try {
+                Resume resume = resumeService.uploadSingle(files[0], source, currentUser.getId());
+                return ResponseEntity.ok(ApiResponse.success(ResumeResponse.from(resume)));
+            } catch (BusinessException e) {
+                return ResponseEntity.badRequest()
+                    .body(ApiResponse.error(400, e.getMessage()));
+            } catch (IOException e) {
+                log.error("File upload error", e);
+                return ResponseEntity.status(500)
+                    .body(ApiResponse.error(500, "File upload failed: " + e.getMessage()));
+            }
+        }
+
+        // For multiple files, use batch response
+        List<BatchUploadResult> results = new ArrayList<>();
+        for (int i = 0; i < files.length; i++) {
+            MultipartFile file = files[i];
+            try {
+                Resume resume = resumeService.uploadSingle(file, source, currentUser.getId());
+                results.add(new BatchUploadResult(i, file.getOriginalFilename(), resume.getStatus().name(), resume.getId(), null));
+            } catch (BusinessException e) {
+                results.add(new BatchUploadResult(i, file.getOriginalFilename(), "FAILED", null, e.getMessage()));
+            } catch (Exception e) {
+                log.error("Unexpected error processing file: {}", file.getOriginalFilename(), e);
+                results.add(new BatchUploadResult(i, file.getOriginalFilename(), "FAILED", null, "Internal server error"));
+            }
+        }
+
+        return ResponseEntity.ok(ApiResponse.success(new BatchUploadResponse(results)));
     }
 
     @GetMapping

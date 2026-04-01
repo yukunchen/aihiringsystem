@@ -44,6 +44,8 @@ public class ResumeService {
         "text/plain"
     );
 
+    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
     private static final Map<String, String> TYPE_EXTENSIONS = Map.of(
         "application/pdf", "pdf",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx",
@@ -51,7 +53,7 @@ public class ResumeService {
     );
 
     @Transactional
-    public Resume upload(MultipartFile file, ResumeSource source, UUID uploadedByUserId) throws IOException {
+    public Resume uploadSingle(MultipartFile file, ResumeSource source, UUID uploadedByUserId) throws IOException {
         validateFile(file);
 
         var user = userRepository.findById(uploadedByUserId)
@@ -84,6 +86,11 @@ public class ResumeService {
         resume = resumeRepository.save(resume);
         eventPublisher.publishEvent(new ResumeUploadedEvent(this, resume.getId(), rawText, file.getContentType()));
         return resume;
+    }
+
+    @Transactional
+    public Resume upload(MultipartFile file, ResumeSource source, UUID uploadedByUserId) throws IOException {
+        return uploadSingle(file, source, uploadedByUserId);
     }
 
     public Resume getById(UUID id) {
@@ -134,6 +141,9 @@ public class ResumeService {
         }
         if (!ALLOWED_TYPES.contains(file.getContentType())) {
             throw new BusinessException(400, "Unsupported file type. Allowed: PDF, DOCX, TXT");
+        }
+        if (file.getSize() > MAX_FILE_SIZE) {
+            throw new BusinessException(400, "File size exceeds 10MB limit");
         }
     }
 

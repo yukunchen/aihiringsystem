@@ -55,7 +55,35 @@ describe('resumes API', () => {
     expect(err.message).toBe('Download failed (502)');
   });
 
-  it('uploadResume() POSTs multipart and returns resume on success', async () => {
+  it('uploadResumes() POSTs multiple files and returns batch response', async () => {
+  const mockResponse = {
+    code: 200, message: 'ok',
+    data: {
+      total: 2, succeeded: 2, failed: 0,
+      results: [
+        { originalIndex: 0, fileName: 'a.pdf', status: 'UPLOADED', resumeId: 'r1', error: null },
+        { originalIndex: 1, fileName: 'b.pdf', status: 'UPLOADED', resumeId: 'r2', error: null },
+      ]
+    }
+  };
+  vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+    ok: true, status: 200, json: () => Promise.resolve(mockResponse),
+  } as Response);
+  const { uploadResumes } = await import('./resumes');
+  const files = [
+    new File(['a'], 'a.pdf', { type: 'application/pdf' }),
+    new File(['b'], 'b.pdf', { type: 'application/pdf' }),
+  ];
+  const result = await uploadResumes(files);
+  expect(result.total).toBe(2);
+  expect(result.succeeded).toBe(2);
+  expect(result.results[0].fileName).toBe('a.pdf');
+  const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
+  expect(url).toBe('/api/resumes/upload?source=MANUAL');
+  expect(init.method).toBe('POST');
+});
+
+it('uploadResume() POSTs multipart and returns resume on success', async () => {
     const mockResume = { id: 'r1', fileName: 'cv.pdf', fileType: 'PDF', source: 'MANUAL', status: 'UPLOADED', uploadedAt: '2026-03-01T00:00:00Z' };
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
       ok: true,

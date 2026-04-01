@@ -11,12 +11,17 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -175,5 +180,123 @@ class ResumeControllerIntegrationTest {
     void unauthenticated_shouldReturn401Or403() throws Exception {
         mockMvc.perform(get("/api/resumes"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void upload_withMultipleFiles_shouldReturnBatchResponse() throws Exception {
+        MockMultipartFile file1 = new MockMultipartFile("files", "resume1.txt", "text/plain", "John Smith\nEngineer".getBytes());
+        MockMultipartFile file2 = new MockMultipartFile("files", "resume2.txt", "text/plain", "Jane Doe\nManager".getBytes());
+
+        mockMvc.perform(multipart("/api/resumes/upload")
+                .file(file1)
+                .file(file2)
+                .with(adminUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.total").value(2))
+                .andExpect(jsonPath("$.data.succeeded").value(2))
+                .andExpect(jsonPath("$.data.failed").value(0))
+                .andExpect(jsonPath("$.data.results[0].fileName").value("resume1.txt"))
+                .andExpect(jsonPath("$.data.results[0].status").value("TEXT_EXTRACTED"))
+                .andExpect(jsonPath("$.data.results[1].fileName").value("resume2.txt"))
+                .andExpect(jsonPath("$.data.results[1].status").value("TEXT_EXTRACTED"));
+    }
+
+    @Test
+    void upload_withNoFilesParam_shouldReturn400() throws Exception {
+        // No 'file' and no 'files' param — Controller should return 400
+        mockMvc.perform(multipart("/api/resumes/upload")
+                .with(adminUser()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400));
+    }
+
+    @Test
+    void upload_withSingleFileUsingFilesParam_shouldWork() throws Exception {
+        MockMultipartFile file = new MockMultipartFile("files", "single.txt", "text/plain", "content".getBytes());
+
+        mockMvc.perform(multipart("/api/resumes/upload")
+                .file(file)
+                .with(adminUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+    }
+
+    @Test
+    void upload_withExceeds100Files_shouldReturn400() throws Exception {
+        // Create 101 files (exceeds 100 limit)
+        List<MockMultipartFile> files = IntStream.range(0, 101)
+                .mapToObj(i -> new MockMultipartFile("files", "resume" + i + ".txt", "text/plain", ("content" + i).getBytes()))
+                .collect(Collectors.toList());
+
+        MockMultipartHttpServletRequestBuilder builder = multipart("/api/resumes/upload");
+        for (MockMultipartFile file : files) {
+            builder.file(file);
+        }
+        mockMvc.perform(builder.with(adminUser()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400));
+    }
+
+    @Test
+    void upload_withTotalSizeExceeds200MB_shouldReturn400() throws Exception {
+        // Create 201 files at 1MB each = 201MB (exceeds 200MB limit)
+        List<MockMultipartFile> files = IntStream.range(0, 201)
+                .mapToObj(i -> new MockMultipartFile("files", "resume" + i + ".txt", "text/plain", new byte[1024 * 1024]))
+                .collect(Collectors.toList());
+
+        MockMultipartHttpServletRequestBuilder builder = multipart("/api/resumes/upload");
+        for (MockMultipartFile file : files) {
+            builder.file(file);
+        }
+        mockMvc.perform(builder.with(adminUser()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400));
+    }
+
+    @Test
+    void upload_withPartialFailure_shouldReturn200WithFailedEntries() throws Exception {
+        MockMultipartFile good1 = new MockMultipartFile("files", "good1.txt", "text/plain", "valid content".getBytes());
+        MockMultipartFile bad = new MockMultipartFile("files", "bad.jpg", "image/jpeg", "not a resume".getBytes());
+        MockMultipartFile good2 = new MockMultipartFile("files", "good2.txt", "text/plain", "also valid".getBytes());
+
+        mockMvc.perform(multipart("/api/resumes/upload")
+                .file(good1)
+                .file(bad)
+                .file(good2)
+                .with(adminUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.total").value(3))
+                .andExpect(jsonPath("$.data.succeeded").value(2))
+                .andExpect(jsonPath("$.data.failed").value(1))
+                .andExpect(jsonPath("$.data.results[0].fileName").value("good1.txt"))
+                .andExpect(jsonPath("$.data.results[0].status").value("TEXT_EXTRACTED"))
+                .andExpect(jsonPath("$.data.results[1].fileName").value("bad.jpg"))
+                .andExpect(jsonPath("$.data.results[1].status").value("FAILED"))
+                .andExpect(jsonPath("$.data.results[1].error").exists())
+                .andExpect(jsonPath("$.data.results[2].fileName").value("good2.txt"))
+                .andExpect(jsonPath("$.data.results[2].status").value("TEXT_EXTRACTED"));
+    }
+
+    @Test
+    void upload_withOneFileOver10MBInBatch_shouldFailOnlyThatFile() throws Exception {
+        byte[] normalContent = "normal resume".getBytes();
+        byte[] bigContent = new byte[11 * 1024 * 1024]; // 11MB - exceeds limit
+        MockMultipartFile good = new MockMultipartFile("files", "good.txt", "text/plain", normalContent);
+        MockMultipartFile tooBig = new MockMultipartFile("files", "big.pdf", "application/pdf", bigContent);
+
+        mockMvc.perform(multipart("/api/resumes/upload")
+                .file(good)
+                .file(tooBig)
+                .with(adminUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.total").value(2))
+                .andExpect(jsonPath("$.data.succeeded").value(1))
+                .andExpect(jsonPath("$.data.failed").value(1))
+                .andExpect(jsonPath("$.data.results[0].status").value("TEXT_EXTRACTED"))
+                .andExpect(jsonPath("$.data.results[1].status").value("FAILED"))
+                .andExpect(jsonPath("$.data.results[1].error").exists());
     }
 }
