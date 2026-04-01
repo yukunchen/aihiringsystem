@@ -132,7 +132,6 @@ class ResumeServiceTest {
         assertEquals(400, ex.getCode());
         assertTrue(ex.getMessage().contains("10MB"));
     }
-    }
 
     @Test
     void getById_shouldReturnResume() {

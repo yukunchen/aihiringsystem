@@ -14,6 +14,10 @@ describe('STATUS_LABELS', () => {
     expect(STATUS_LABELS['AI_PROCESSED']).toBe('AI Processed');
   });
 
+  it('maps VECTORIZATION_FAILED to Vectorization Failed', () => {
+    expect(STATUS_LABELS['VECTORIZATION_FAILED']).toBe('Vectorization Failed');
+  });
+
   it('does not contain old frontend-only keys (PARSED, PARSING, etc.)', () => {
     expect(STATUS_LABELS['PARSED']).toBeUndefined();
     expect(STATUS_LABELS['PARSING']).toBeUndefined();
@@ -34,6 +38,10 @@ describe('STATUS_COLORS', () => {
 
   it('assigns success color for AI_PROCESSED', () => {
     expect(STATUS_COLORS['AI_PROCESSED']).toBe('success');
+  });
+
+  it('assigns error color for VECTORIZATION_FAILED', () => {
+    expect(STATUS_COLORS['VECTORIZATION_FAILED']).toBe('error');
   });
 });
 

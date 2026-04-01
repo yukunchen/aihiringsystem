@@ -11,7 +11,6 @@ import java.util.UUID;
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 class AiMatchingClientTest {
 
@@ -31,50 +30,55 @@ class AiMatchingClientTest {
     }
 
     @Test
-    void vectorizeResume_callsCorrectEndpointWithPayload() {
+    void vectorizeResume_success_returnsTrue() {
         UUID resumeId = UUID.randomUUID();
         wm.stubFor(post(urlEqualTo("/internal/vectorize/resume"))
             .willReturn(aResponse().withStatus(200)
                 .withHeader("Content-Type", "application/json")
                 .withBody("{\"status\":\"ok\"}")));
 
-        client.vectorizeResume(resumeId, "John Smith Java developer");
+        boolean result = client.vectorizeResume(resumeId, "John Smith Java developer");
 
+        assertThat(result).isTrue();
         wm.verify(postRequestedFor(urlEqualTo("/internal/vectorize/resume"))
             .withRequestBody(matchingJsonPath("$.resume_id"))
             .withRequestBody(matchingJsonPath("$.raw_text", equalTo("John Smith Java developer"))));
     }
 
     @Test
-    void vectorizeResume_doesNotThrowWhenServiceReturnsError() {
+    void vectorizeResume_serviceError_returnsFalse() {
         wm.stubFor(post(urlEqualTo("/internal/vectorize/resume"))
             .willReturn(aResponse().withStatus(500)));
 
-        assertDoesNotThrow(() -> client.vectorizeResume(UUID.randomUUID(), "text"));
+        boolean result = client.vectorizeResume(UUID.randomUUID(), "text");
+
+        assertThat(result).isFalse();
     }
 
     @Test
-    void vectorizeJob_callsCorrectEndpoint() {
+    void vectorizeJob_success_returnsTrue() {
         UUID jobId = UUID.randomUUID();
         wm.stubFor(post(urlEqualTo("/internal/vectorize/job"))
             .willReturn(aResponse().withStatus(200)
                 .withHeader("Content-Type", "application/json")
                 .withBody("{\"status\":\"ok\"}")));
 
-        client.vectorizeJob(jobId, "Engineer", "Build things", "5yr", "Java");
+        boolean result = client.vectorizeJob(jobId, "Engineer", "Build things", "5yr", "Java");
 
+        assertThat(result).isTrue();
         wm.verify(postRequestedFor(urlEqualTo("/internal/vectorize/job"))
             .withRequestBody(matchingJsonPath("$.job_id"))
             .withRequestBody(matchingJsonPath("$.title", equalTo("Engineer"))));
     }
 
     @Test
-    void vectorizeJob_doesNotThrowWhenServiceReturnsError() {
+    void vectorizeJob_serviceError_returnsFalse() {
         wm.stubFor(post(urlEqualTo("/internal/vectorize/job"))
             .willReturn(aResponse().withStatus(503)));
 
-        assertDoesNotThrow(() ->
-            client.vectorizeJob(UUID.randomUUID(), "T", "D", null, null));
+        boolean result = client.vectorizeJob(UUID.randomUUID(), "T", "D", null, null);
+
+        assertThat(result).isFalse();
     }
 
     @Test

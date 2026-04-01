@@ -27,7 +27,7 @@ public class AiMatchingClient {
             .build();
     }
 
-    public void vectorizeResume(UUID resumeId, String rawText) {
+    public boolean vectorizeResume(UUID resumeId, String rawText) {
         try {
             restClient.post()
                 .uri("/internal/vectorize/resume")
@@ -35,12 +35,14 @@ public class AiMatchingClient {
                 .body(new VectorizeResumeRequest(resumeId, rawText))
                 .retrieve()
                 .toBodilessEntity();
+            return true;
         } catch (RestClientException e) {
             log.warn("Failed to vectorize resume {}: {}", resumeId, e.getMessage());
+            return false;
         }
     }
 
-    public void vectorizeJob(UUID jobId, String title, String description,
+    public boolean vectorizeJob(UUID jobId, String title, String description,
                               String requirements, String skills) {
         try {
             restClient.post()
@@ -49,8 +51,10 @@ public class AiMatchingClient {
                 .body(new VectorizeJobRequest(jobId, title, description, requirements, skills))
                 .retrieve()
                 .toBodilessEntity();
+            return true;
         } catch (RestClientException e) {
             log.warn("Failed to vectorize job {}: {}", jobId, e.getMessage());
+            return false;
         }
     }
 
