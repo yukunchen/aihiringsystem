@@ -3,9 +3,12 @@ import { Table, Button, Tag, Popconfirm, Space, message, Empty } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { listResumes, deleteResume, downloadResume, type ResumeListItem, type Page } from '../../api/resumes';
 
-const STATUS_COLORS: Record<string, string> = {
-  UPLOADED: 'default', PARSING: 'processing', PARSED: 'success',
-  PARSE_FAILED: 'error', VECTORIZING: 'processing', VECTORIZED: 'success',
+export const STATUS_COLORS: Record<string, string> = {
+  UPLOADED: 'default', TEXT_EXTRACTED: 'processing', AI_PROCESSED: 'success',
+};
+
+export const STATUS_LABELS: Record<string, string> = {
+  UPLOADED: 'Uploaded', TEXT_EXTRACTED: 'Text Extracted', AI_PROCESSED: 'AI Processed',
 };
 
 export default function ResumeListPage() {
@@ -55,7 +58,7 @@ export default function ResumeListPage() {
     { title: 'Source', dataIndex: 'source', key: 'source' },
     {
       title: 'Status', dataIndex: 'status', key: 'status',
-      render: (status: string) => <Tag color={STATUS_COLORS[status] ?? 'default'}>{status}</Tag>,
+      render: (status: string) => <Tag color={STATUS_COLORS[status] ?? 'default'}>{STATUS_LABELS[status] ?? status}</Tag>,
     },
     { title: 'Uploaded', dataIndex: 'uploadedAt', key: 'uploadedAt', render: (d: string) => new Date(d).toLocaleDateString() },
     {

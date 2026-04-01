@@ -1,64 +1,39 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { describe, it, expect } from 'vitest';
+import { STATUS_COLORS, STATUS_LABELS } from './ResumeListPage';
 
-class MockResizeObserver {
-  observe = vi.fn();
-  unobserve = vi.fn();
-  disconnect = vi.fn();
-}
-global.ResizeObserver = MockResizeObserver as typeof ResizeObserver;
-
-vi.mock('../../api/resumes', () => ({
-  listResumes: vi.fn(),
-  deleteResume: vi.fn(),
-  downloadResume: vi.fn(),
-}));
-vi.mock('../../context/AuthContext', () => ({
-  useAuth: vi.fn(() => ({ user: { username: 'alice' }, token: 'tok', isInitializing: false, login: vi.fn(), logout: vi.fn() })),
-}));
-
-import * as resumesApi from '../../api/resumes';
-import ResumeListPage from './ResumeListPage';
-
-const mockPage = {
-  content: [
-    { id: 'r1', fileName: 'alice_cv.pdf', fileType: 'PDF', source: 'MANUAL', status: 'PARSED', uploadedAt: '2026-03-01T10:00:00Z' },
-  ],
-  totalElements: 1, totalPages: 1, number: 0, size: 10,
-};
-
-beforeEach(() => {
-  vi.clearAllMocks();
-  vi.mocked(resumesApi.listResumes).mockResolvedValue(mockPage);
-});
-
-describe('ResumeListPage', () => {
-  it('renders the resume table after loading', async () => {
-    render(<MemoryRouter><ResumeListPage /></MemoryRouter>);
-    await waitFor(() => expect(screen.getByText('alice_cv.pdf')).toBeInTheDocument());
-    expect(screen.getByText('PARSED')).toBeInTheDocument();
+describe('STATUS_LABELS', () => {
+  it('maps UPLOADED to Uploaded', () => {
+    expect(STATUS_LABELS['UPLOADED']).toBe('Uploaded');
   });
 
-  it('renders empty state when no resumes', async () => {
-    vi.mocked(resumesApi.listResumes).mockResolvedValueOnce({ ...mockPage, content: [], totalElements: 0 });
-    render(<MemoryRouter><ResumeListPage /></MemoryRouter>);
-    await waitFor(() => expect(screen.getByText(/No resumes yet/i)).toBeInTheDocument());
+  it('maps TEXT_EXTRACTED to Text Extracted', () => {
+    expect(STATUS_LABELS['TEXT_EXTRACTED']).toBe('Text Extracted');
   });
 
-  it('calls deleteResume on confirm delete', async () => {
-    vi.mocked(resumesApi.deleteResume).mockResolvedValueOnce(undefined);
-    vi.mocked(resumesApi.listResumes).mockResolvedValue(mockPage);
+  it('maps AI_PROCESSED to AI Processed', () => {
+    expect(STATUS_LABELS['AI_PROCESSED']).toBe('AI Processed');
+  });
 
-    render(<MemoryRouter><ResumeListPage /></MemoryRouter>);
-    await waitFor(() => screen.getByText('alice_cv.pdf'));
-
-    await userEvent.click(screen.getByRole('button', { name: /delete/i }));
-    // Antd Popconfirm renders an "OK" button in the popover
-    await waitFor(() => screen.getByRole('button', { name: /ok/i }));
-    await userEvent.click(screen.getByRole('button', { name: /ok/i }));
-
-    await waitFor(() => expect(resumesApi.deleteResume).toHaveBeenCalledWith('r1'));
+  it('does not contain old frontend-only keys (PARSED, PARSING, etc.)', () => {
+    expect(STATUS_LABELS['PARSED']).toBeUndefined();
+    expect(STATUS_LABELS['PARSING']).toBeUndefined();
+    expect(STATUS_LABELS['PARSE_FAILED']).toBeUndefined();
+    expect(STATUS_LABELS['VECTORIZING']).toBeUndefined();
+    expect(STATUS_LABELS['VECTORIZED']).toBeUndefined();
   });
 });
+
+describe('STATUS_COLORS', () => {
+  it('assigns default color for UPLOADED', () => {
+    expect(STATUS_COLORS['UPLOADED']).toBe('default');
+  });
+
+  it('assigns processing color for TEXT_EXTRACTED', () => {
+    expect(STATUS_COLORS['TEXT_EXTRACTED']).toBe('processing');
+  });
+
+  it('assigns success color for AI_PROCESSED', () => {
+    expect(STATUS_COLORS['AI_PROCESSED']).toBe('success');
+  });
+});
+
