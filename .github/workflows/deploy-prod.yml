@@ -43,5 +43,28 @@ jobs:
       - name: Health check
         run: |
           sleep 45
-          curl -sf http://${{ secrets.VPS_HOST }}:8080/api/auth/login -X POST -H "Content-Type: application/json" -d '{}' || exit 1
+          BACKEND_BASE="http://${{ secrets.VPS_HOST }}:8080"
+          AI_BASE="http://${{ secrets.VPS_HOST }}:8000"
+
+          echo "Checking backend liveliness..."
+          BACKEND_CODE=$(curl -s -o /tmp/prod-backend-health.txt -w "%{http_code}" \
+            "$BACKEND_BASE/api/auth/login" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -d '{}')
+
+          if [ "$BACKEND_CODE" -ge 200 ] && [ "$BACKEND_CODE" -lt 500 ]; then
+            echo "Backend reachable (HTTP $BACKEND_CODE)"
+          else
+            echo "Backend health check failed (HTTP $BACKEND_CODE)"
+            cat /tmp/prod-backend-health.txt || true
+            exit 1
+          fi
+
+          echo "Checking AI service /health..."
+          curl -sf "$AI_BASE/health" > /dev/null || {
+            echo "AI service health check failed"
+            exit 1
+          }
+
           echo "Production deployment successful"
