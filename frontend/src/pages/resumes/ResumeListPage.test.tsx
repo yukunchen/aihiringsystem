@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { STATUS_COLORS, STATUS_LABELS } from './ResumeListPage';
+import { STATUS_COLORS, STATUS_LABELS } from './resumeStatus';
 
 describe('STATUS_LABELS', () => {
   it('maps UPLOADED to Uploaded', () => {
