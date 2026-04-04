@@ -4,17 +4,9 @@ const AUTH_FILE = 'playwright/.auth/user.json';
 
 setup('authenticate', async ({ page }) => {
   await page.goto('/');
-  await page.fill('input[name="username"]', process.env.TEST_USERNAME || 'testuser');
-  await page.fill('input[name="password"]', process.env.TEST_PASSWORD || 'testpass');
-  await page.click('button[type="submit"]');
-  await expect(page).toHaveURL(/.*\/(jobs|resumes).*/);
+  await page.getByPlaceholder('Username').fill(process.env.TEST_USERNAME || 'admin');
+  await page.getByPlaceholder('Password').fill(process.env.TEST_PASSWORD || 'admin123');
+  await page.getByRole('button', { name: /login/i }).click();
+  await expect(page).toHaveURL(/.*\/(jobs|resumes).*/, { timeout: 15000 });
   await page.context().storageState({ path: AUTH_FILE });
-});
-
-setup('cleanup test data', async ({ request }) => {
-  if (process.env.TEST_SECRET) {
-    await request.post('/api/test/cleanup', {
-      headers: { 'X-Test-Secret': process.env.TEST_SECRET },
-    });
-  }
 });

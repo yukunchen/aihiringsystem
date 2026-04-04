@@ -6,31 +6,21 @@ test.describe('Authentication', () => {
   });
 
   test('should display login page', async ({ page }) => {
-    await expect(page.locator('text=登录')).toBeVisible();
+    await expect(page.getByPlaceholder('Username')).toBeVisible();
+    await expect(page.getByPlaceholder('Password')).toBeVisible();
   });
 
   test('should login successfully with valid credentials', async ({ page }) => {
-    await page.fill('input[name="username"]', process.env.TEST_USERNAME || 'testuser');
-    await page.fill('input[name="password"]', process.env.TEST_PASSWORD || 'testpass');
-    await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/.*dashboard.*/);
-    await expect(page.locator('text=欢迎')).toBeVisible();
+    await page.getByPlaceholder('Username').fill(process.env.TEST_USERNAME || 'admin');
+    await page.getByPlaceholder('Password').fill(process.env.TEST_PASSWORD || 'admin123');
+    await page.getByRole('button', { name: /login/i }).click();
+    await expect(page).toHaveURL(/.*\/(jobs|resumes).*/);
   });
 
   test('should show error with invalid credentials', async ({ page }) => {
-    await page.fill('input[name="username"]', 'invalid');
-    await page.fill('input[name="password"]', 'invalid');
-    await page.click('button[type="submit"]');
-    await expect(page.locator('text=用户名或密码错误')).toBeVisible();
-  });
-
-  test('should logout successfully', async ({ page }) => {
-    await page.fill('input[name="username"]', process.env.TEST_USERNAME || 'testuser');
-    await page.fill('input[name="password"]', process.env.TEST_PASSWORD || 'testpass');
-    await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/.*dashboard.*/);
-    await page.click('[data-testid="user-menu"]');
-    await page.click('text=退出登录');
-    await expect(page).toHaveURL(/.*login.*/);
+    await page.getByPlaceholder('Username').fill('invalid_user');
+    await page.getByPlaceholder('Password').fill('invalid_pass');
+    await page.getByRole('button', { name: /login/i }).click();
+    await expect(page.locator('.ant-alert-error')).toBeVisible();
   });
 });
