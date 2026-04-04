@@ -1,0 +1,42 @@
+name: Feature Request
+description: Suggest a new feature or enhancement
+labels: [feature]
+body:
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Problem / Motivation
+      description: What problem does this feature solve? What is the use case?
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Describe your proposed solution or approach
+    validations:
+      required: true
+
+  - type: dropdown
+    id: module
+    attributes:
+      label: Target module
+      description: Which part of the system would this affect
+      options:
+        - ui
+        - api
+        - auth
+        - ai-service
+        - infra
+        - not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Any other context, mockups, or references
+    validations:
+      required: false

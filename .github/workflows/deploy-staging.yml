@@ -93,6 +93,8 @@ jobs:
   verify:
     needs: deploy
     runs-on: ubuntu-latest
+    outputs:
+      smoke_passed: ${{ steps.smoke.outputs.pass }}
     permissions:
       issues: write
     steps:
@@ -238,11 +240,84 @@ jobs:
               exit 0
             fi
             for ISSUE in $ISSUES; do
+              ISSUE_BODY=$(gh issue view "$ISSUE" --repo "${{ github.repository }}" --json body -q '.body' 2>/dev/null || echo "")
               LOG="/opt/ai-hiring/logs/verify-issue-${ISSUE}.log"
               nohup /opt/ai-hiring/scripts/verify-issue.sh \
-                "$ISSUE" "http://localhost:8082" \
+                "$ISSUE" "http://localhost:8082" "$ISSUE_BODY" \
                 >> "$LOG" 2>&1 &
               echo "Launched verifier for issue #$ISSUE (PID $!) — log: $LOG"
             done
         env:
           COMMIT_MSG: ${{ github.event.head_commit.message }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  e2e:
+    needs: verify
+    if: needs.verify.outputs.smoke_passed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: e2e-tests/package-lock.json
+      - name: Install dependencies
+        working-directory: e2e-tests
+        run: npm ci
+      - name: Install Playwright browsers
+        working-directory: e2e-tests
+        run: npx playwright install chromium
+      - name: Run E2E tests
+        working-directory: e2e-tests
+        run: npx playwright test --project=chromium
+        env:
+          BASE_URL: http://${{ secrets.VPS_HOST }}:3002
+          TEST_USERNAME: ${{ secrets.TEST_USERNAME }}
+          TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: staging-e2e-test-results
+          path: e2e-tests/playwright-report/
+
+  report-failure:
+    needs: [deploy, verify, e2e]
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Create failure issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const sha = '${{ github.sha }}'.substring(0, 7);
+            const runUrl = '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}';
+            const title = `Staging deploy failed: commit ${sha}`;
+            const body = `## Deployment Failure\n\n` +
+              `- **Environment**: staging\n` +
+              `- **Branch**: master\n` +
+              `- **Commit**: \`${{ github.sha }}\`\n` +
+              `- **Workflow run**: ${runUrl}\n\n` +
+              `This issue was auto-created by the deploy failure handler.`;
+
+            try {
+              await octokit.rest.issues.getLabel({...context.repo, name: 'deployment'});
+            } catch (e) {
+              await octokit.rest.issues.createLabel({
+                ...context.repo,
+                name: 'deployment',
+                color: 'e99695',
+                description: 'Deployment related issue'
+              });
+            }
+
+            await octokit.rest.issues.create({
+              ...context.repo,
+              title: title,
+              body: body,
+              labels: ['bug', 'deployment']
+            });

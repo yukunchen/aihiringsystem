@@ -119,3 +119,44 @@ jobs:
         with:
           name: e2e-test-results
           path: e2e-tests/playwright-report/
+
+  report-failure:
+    needs: [deploy, e2e]
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Create failure issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const sha = '${{ github.sha }}'.substring(0, 7);
+            const runUrl = '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}';
+            const branch = '${{ github.ref_name }}';
+            const title = `Dev deploy failed: commit ${sha}`;
+            const body = `## Deployment Failure\n\n` +
+              `- **Environment**: dev\n` +
+              `- **Branch**: ${branch}\n` +
+              `- **Commit**: \`${{ github.sha }}\`\n` +
+              `- **Workflow run**: ${runUrl}\n\n` +
+              `This issue was auto-created by the deploy failure handler.`;
+
+            // Ensure label exists
+            try {
+              await octokit.rest.issues.getLabel({...context.repo, name: 'deployment'});
+            } catch (e) {
+              await octokit.rest.issues.createLabel({
+                ...context.repo,
+                name: 'deployment',
+                color: 'e99695',
+                description: 'Deployment related issue'
+              });
+            }
+
+            await octokit.rest.issues.create({
+              ...context.repo,
+              title: title,
+              body: body,
+              labels: ['bug', 'deployment']
+            });

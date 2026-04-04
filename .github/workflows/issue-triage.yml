@@ -1,0 +1,53 @@
+name: Issue Triage
+
+on:
+  issues:
+    types: [opened, edited]
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Apply module labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = (context.payload.issue.body || '').toLowerCase();
+            const title = (context.payload.issue.title || '').toLowerCase();
+            const text = title + ' ' + body;
+
+            const rules = [
+              { keywords: ['部门', '用户', '权限', '角色', '登录', 'auth', 'login', 'role', 'permission', 'department'],
+                labels: ['auth'] },
+              { keywords: ['简历', '上传', 'resume', 'upload', '解析', 'parse'],
+                labels: ['resume'] },
+              { keywords: ['职位', '匹配', 'jd', 'job', 'match', '推荐'],
+                labels: ['job', 'ai-service'] },
+              { keywords: ['ai', '向量', 'vector', 'milvus', 'qdrant', 'embedding', 'llm', '评分'],
+                labels: ['ai-service'] },
+              { keywords: ['页面', '前端', 'ui', '界面', '样式', 'antd', 'react', '组件'],
+                labels: ['ui'] },
+              { keywords: ['部署', 'ci', 'cd', 'deploy', 'docker', 'pipeline', '构建', 'infra', '环境'],
+                labels: ['infra'] },
+              { keywords: ['boss', 'boss直聘', '直聘', '同步', 'sync'],
+                labels: ['boss-integration'] },
+            ];
+
+            const labelsToAdd = [];
+            for (const rule of rules) {
+              if (rule.keywords.some(kw => text.includes(kw))) {
+                labelsToAdd.push(...rule.labels);
+              }
+            }
+
+            const uniqueLabels = [...new Set(labelsToAdd)];
+            if (uniqueLabels.length > 0) {
+              await octokit.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                labels: uniqueLabels
+              });
+            }

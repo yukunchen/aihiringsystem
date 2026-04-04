@@ -26,18 +26,30 @@ jobs:
     needs: verify
     runs-on: ubuntu-latest
     environment: production
+    outputs:
+      previous_version: ${{ steps.save_version.outputs.previous }}
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
     steps:
       - uses: actions/checkout@v4
+      - name: Save current version
+        id: save_version
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            PREV=$(grep "IMAGE_TAG=" /opt/ai-hiring/docker/prod/.env 2>/dev/null | cut -d= -f2 || echo "unknown")
+            echo "previous=$PREV" >> $GITHUB_OUTPUT
       - name: Copy deploy scripts to VPS
         uses: appleboy/scp-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          source: "scripts/deploy.sh,scripts/health-check.sh"
+          source: "scripts/deploy.sh,scripts/health-check.sh,scripts/rollback.sh"
           target: /tmp/ai-hiring-scripts
       - name: Deploy to Production
         uses: appleboy/ssh-action@v1
@@ -49,7 +61,8 @@ jobs:
           script: |
             cp /tmp/ai-hiring-scripts/scripts/deploy.sh /opt/ai-hiring/scripts/deploy.sh
             cp /tmp/ai-hiring-scripts/scripts/health-check.sh /opt/ai-hiring/scripts/health-check.sh
-            chmod +x /opt/ai-hiring/scripts/deploy.sh /opt/ai-hiring/scripts/health-check.sh
+            cp /tmp/ai-hiring-scripts/scripts/rollback.sh /opt/ai-hiring/scripts/rollback.sh
+            chmod +x /opt/ai-hiring/scripts/deploy.sh /opt/ai-hiring/scripts/health-check.sh /opt/ai-hiring/scripts/rollback.sh
             export OPENAI_API_KEY="$OPENAI_API_KEY"
             /opt/ai-hiring/scripts/deploy.sh prod ${{ inputs.version }} "$GHCR_TOKEN"
       - name: Health check
@@ -80,3 +93,65 @@ jobs:
           }
 
           echo "Production deployment successful"
+
+  rollback:
+    needs: deploy
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Rollback to previous version
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: GHCR_TOKEN
+          script: |
+            echo "Production deploy failed - initiating rollback..."
+            /opt/ai-hiring/scripts/rollback.sh prod "${{ needs.deploy.outputs.previous_version }}" || echo "Rollback failed - manual intervention required"
+        env:
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+
+  alert:
+    needs: [deploy, rollback]
+    if: always() && needs.deploy.result == 'failure'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Create production alert issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const sha = '${{ inputs.version }}'.substring(0, 7);
+            const prevSha = '${{ needs.deploy.outputs.previous_version }}'.substring(0, 7);
+            const runUrl = '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}';
+            const rollbackStatus = '${{ needs.rollback.result }}';
+
+            const title = `Production deploy failed and rolled back: ${sha}`;
+            const body = `## Production Deployment Failure\n\n` +
+              `- **Attempted version**: \`${{ inputs.version }}\`\n` +
+              `- **Rolled back to**: \`${{ needs.deploy.outputs.previous_version }}\`\n` +
+              `- **Rollback status**: ${rollbackStatus}\n` +
+              `- **Workflow run**: ${runUrl}\n\n` +
+              `**IMMEDIATE ACTION REQUIRED** - investigate before re-deploying.\n\n` +
+              `This issue was auto-created by the production deploy failure handler.`;
+
+            // Ensure label exists
+            try {
+              await octokit.rest.issues.getLabel({...context.repo, name: 'deployment'});
+            } catch (e) {
+              await octokit.rest.issues.createLabel({
+                ...context.repo,
+                name: 'deployment',
+                color: 'e99695',
+                description: 'Deployment related issue'
+              });
+            }
+
+            await octokit.rest.issues.create({
+              ...context.repo,
+              title: title,
+              body: body,
+              labels: ['bug', 'deployment']
+            });
