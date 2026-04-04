@@ -179,14 +179,7 @@ jobs:
             STATUS="Staging smoke tests **failed**"
           fi
 
-          BODY="${ICON} **Staging Deploy Complete** — commit \`${SHA:0:7}\`
-
-${STATUS}
-
-**Checks:**
-${DETAILS}
-
-[View deployment run](${RUN_URL})"
+          BODY="${ICON} **Staging Deploy Complete** — commit \`${SHA:0:7}\`"$'\n\n'"${STATUS}"$'\n\n'"**Checks:**"$'\n'"${DETAILS}"$'\n\n'"[View deployment run](${RUN_URL})"
 
           for ISSUE in $ISSUES; do
             gh issue comment "$ISSUE" \
