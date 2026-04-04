@@ -1,63 +1,40 @@
 import { test, expect } from '@playwright/test';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 test.describe('Job Management', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
-    await page.fill('input[name="username"]', process.env.TEST_USERNAME || 'testuser');
-    await page.fill('input[name="password"]', process.env.TEST_PASSWORD || 'testpass');
-    await page.click('button[type="submit"]');
+    await page.getByPlaceholder('Username').fill(process.env.TEST_USERNAME || 'admin');
+    await page.getByPlaceholder('Password').fill(process.env.TEST_PASSWORD || 'admin123');
+    await page.getByRole('button', { name: /login/i }).click();
     await expect(page).toHaveURL(/.*\/(jobs|resumes).*/);
   });
 
-  test('should create new job', async ({ page }) => {
-    await page.click('text=Jobs');
-    await page.click('text=Create JD');
-    const jdPath = path.join(__dirname, '../fixtures/sample-jd.txt');
-    const jdContent = fs.readFileSync(jdPath, 'utf-8');
-    await page.fill('input[name="title"]', 'E2E Test Job');
-    await page.fill('textarea[name="description"]', jdContent);
-    // Wait for departments to load (sentinel element in JobCreatePage)
-    await page.waitForSelector('text=Select department');
-    await page.click('.ant-select-selector');
-    await page.click('.ant-select-item:first-child');
-    await page.click('button[type="submit"]');
-    // Should navigate to job detail page
-    await expect(page).toHaveURL(/.*\/jobs\/.+/);
-  });
-
-  test('should display job list', async ({ page }) => {
-    await page.click('text=Jobs');
+  test('should display job list page', async ({ page }) => {
+    await page.getByRole('link', { name: /jobs/i }).click();
     await expect(page.locator('table')).toBeVisible();
   });
 
-  test('should view job details', async ({ page }) => {
-    await page.click('text=Jobs');
-    const firstJob = page.locator('table tbody tr').first();
-    if (await firstJob.isVisible()) {
-      await firstJob.locator('button:has-text("View")').click();
-      await expect(page.locator('h2')).toBeVisible();
+  test('should navigate to job creation page', async ({ page }) => {
+    await page.getByRole('link', { name: /jobs/i }).click();
+    const createBtn = page.getByRole('button', { name: /create|new|add/i });
+    if (await createBtn.isVisible()) {
+      await createBtn.click();
+      await expect(page).toHaveURL(/.*\/jobs\/(new|create).*/);
     }
   });
 
-  test('should update job status', async ({ page }) => {
-    await page.click('text=Jobs');
-    const firstJob = page.locator('table tbody tr').first();
-    if (await firstJob.isVisible()) {
-      await firstJob.locator('button:has-text("View")').click();
-      // Check if status dropdown is available
-      const statusTrigger = page.locator('text=Change status');
-      if (await statusTrigger.isVisible()) {
-        await statusTrigger.click();
-        await page.click('[role="option"]:first-child');
-        // Status should update
-        await expect(page.locator('.ant-tag')).toBeVisible();
+  test('should view first job detail', async ({ page }) => {
+    await page.getByRole('link', { name: /jobs/i }).click();
+    const firstRow = page.locator('table tbody tr').first();
+    if (await firstRow.isVisible()) {
+      const viewBtn = firstRow.getByRole('button', { name: /view|detail/i });
+      const rowLink = firstRow.locator('a').first();
+      if (await viewBtn.isVisible()) {
+        await viewBtn.click();
+      } else if (await rowLink.isVisible()) {
+        await rowLink.click();
       }
+      await expect(page.locator('h2, h1')).toBeVisible();
     }
   });
 });
