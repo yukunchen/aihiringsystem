@@ -201,19 +201,19 @@ jobs:
             else
               MSG="❌ Staging Deploy FAILED — commit ${SHA:0:7}"
             fi
-            python3 -c "
-            import json, datetime
+            python3 << 'PYEOF'
+            import json, datetime, os
             entry = {
-              'id': '${SHA:0:7}',
+              'id': os.environ['SHA'][:7],
               'timestamp': datetime.datetime.utcnow().isoformat() + 'Z',
               'read': False,
-              'message': '$MSG',
-              'details': '$DETAILS',
-              'run_url': '$RUN_URL'
+              'message': os.environ.get('MSG', ''),
+              'details': os.environ.get('DETAILS', ''),
+              'run_url': os.environ.get('RUN_URL', '')
             }
             with open('/opt/ai-hiring/notifications/queue.jsonl', 'a') as f:
                 f.write(json.dumps(entry) + '\n')
-            "
+            PYEOF
         env:
           PASS: ${{ steps.smoke.outputs.pass }}
           SHA: ${{ github.sha }}
