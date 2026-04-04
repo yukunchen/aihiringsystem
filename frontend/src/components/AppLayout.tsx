@@ -1,6 +1,6 @@
 import { Layout, Menu, Button, Typography, Space } from 'antd';
 import { FileTextOutlined, SolutionOutlined } from '@ant-design/icons';
-import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const { Sider, Header, Content } = Layout;
@@ -25,8 +25,8 @@ export default function AppLayout() {
           mode="inline"
           selectedKeys={[selectedKey]}
           items={[
-            { key: 'resumes', icon: <FileTextOutlined />, label: 'Resumes', onClick: () => navigate('/resumes') },
-            { key: 'jobs', icon: <SolutionOutlined />, label: 'Jobs', onClick: () => navigate('/jobs') },
+            { key: 'resumes', icon: <FileTextOutlined />, label: <Link to="/resumes">Resumes</Link> },
+            { key: 'jobs', icon: <SolutionOutlined />, label: <Link to="/jobs">Jobs</Link> },
           ]}
         />
       </Sider>
