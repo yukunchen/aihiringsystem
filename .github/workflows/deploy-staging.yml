@@ -66,6 +66,15 @@ jobs:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
     steps:
+      - uses: actions/checkout@v4
+      - name: Copy deploy scripts to VPS
+        uses: appleboy/scp-action@v0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "scripts/deploy.sh,scripts/health-check.sh"
+          target: /tmp/ai-hiring-scripts
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1
         with:
@@ -75,6 +84,9 @@ jobs:
           envs: OPENAI_API_KEY,GHCR_TOKEN
           command_timeout: 15m
           script: |
+            cp /tmp/ai-hiring-scripts/scripts/deploy.sh /opt/ai-hiring/scripts/deploy.sh
+            cp /tmp/ai-hiring-scripts/scripts/health-check.sh /opt/ai-hiring/scripts/health-check.sh
+            chmod +x /opt/ai-hiring/scripts/deploy.sh /opt/ai-hiring/scripts/health-check.sh
             export OPENAI_API_KEY="$OPENAI_API_KEY"
             /opt/ai-hiring/scripts/deploy.sh staging ${{ github.sha }} "$GHCR_TOKEN"
 

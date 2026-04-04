@@ -59,6 +59,28 @@ until curl -sf -o /dev/null -w "%{http_code}" "http://localhost:${BACKEND_PORT}/
 done
 echo "✅ Backend ready after ${ELAPSED}s"
 
+# Wait for AI service to be ready
+echo "⏳ Waiting for AI service to be ready..."
+AI_PORT=$(grep "AI_PORT=" "$COMPOSE_DIR/.env" 2>/dev/null | cut -d= -f2)
+if [ -z "$AI_PORT" ]; then
+    case $ENV in
+        dev) AI_PORT=8001 ;;
+        staging) AI_PORT=8002 ;;
+        prod) AI_PORT=8000 ;;
+    esac
+fi
+ELAPSED=0
+until curl -sf "http://localhost:${AI_PORT}/health" > /dev/null 2>&1; do
+    if [ $ELAPSED -ge $TIMEOUT ]; then
+        echo "❌ AI service did not become ready within ${TIMEOUT}s"
+        exit 1
+    fi
+    sleep 5
+    ELAPSED=$((ELAPSED + 5))
+    echo "  ... AI service still starting (${ELAPSED}s)"
+done
+echo "✅ AI service ready after ${ELAPSED}s"
+
 # Health check
 "$SCRIPT_DIR/health-check.sh" "$ENV"
 
