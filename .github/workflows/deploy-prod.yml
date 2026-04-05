@@ -45,7 +45,9 @@ jobs:
             grep "IMAGE_TAG=" /opt/ai-hiring/docker/prod/.env 2>/dev/null | cut -d= -f2 || echo "unknown"
       - name: Set previous version output
         id: set_version
-        run: echo "previous=${{ steps.save_version.outputs.stdout }}" >> "$GITHUB_OUTPUT"
+        run: |
+          PREV=$(echo "${{ steps.save_version.outputs.stdout }}" | head -1 | tr -d '[:space:]')
+          echo "previous=${PREV:-unknown}" >> "$GITHUB_OUTPUT"
       - name: Copy deploy scripts to VPS
         uses: appleboy/scp-action@v1
         with:
