@@ -185,11 +185,9 @@ export default function JobDetailPage() {
             <Input />
           </Form.Item>
           <Form.Item name="departmentId" label="Department" rules={[{ required: true }]}>
-            <Select>
-              {departments.map((d) => (
-                <Select.Option key={d.id} value={d.id}>{d.name}</Select.Option>
-              ))}
-            </Select>
+            <Select
+              options={departments.map((d) => ({ value: d.id, label: d.name }))}
+            />
           </Form.Item>
           <Form.Item name="description" label="Description" rules={[{ required: true }]}>
             <Input.TextArea rows={4} />

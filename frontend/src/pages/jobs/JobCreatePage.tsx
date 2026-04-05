@@ -46,12 +46,9 @@ export default function JobCreatePage() {
         <Form.Item name="departmentId" label="Department" rules={[{ required: true }]}>
           <Select
             placeholder="Select department"
-            onDropdownVisibleChange={setDropdownOpen}
-          >
-            {departments.map((d) => (
-              <Select.Option key={d.id} value={d.id}>{d.name}</Select.Option>
-            ))}
-          </Select>
+            onOpenChange={setDropdownOpen}
+            options={departments.map((d) => ({ value: d.id, label: d.name }))}
+          />
         </Form.Item>
         <Form.Item name="description" label="Description" rules={[{ required: true }]}>
           <Input.TextArea rows={4} placeholder="Description" />
