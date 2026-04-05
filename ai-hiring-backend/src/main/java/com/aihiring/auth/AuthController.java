@@ -2,10 +2,14 @@ package com.aihiring.auth;
 
 import com.aihiring.auth.dto.*;
 import com.aihiring.common.dto.ApiResponse;
+import com.aihiring.common.security.UserDetailsImpl;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -30,5 +34,16 @@ public class AuthController {
     public ResponseEntity<ApiResponse<Void>> logout(@Valid @RequestBody LogoutRequest request) {
         authService.logout(request);
         return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> me(@AuthenticationPrincipal UserDetailsImpl user) {
+        return ResponseEntity.ok(ApiResponse.success(Map.of(
+                "id", user.getId(),
+                "username", user.getUsername(),
+                "roles", user.getRoles(),
+                "permissions", user.getPermissions(),
+                "departmentId", user.getDepartmentId() != null ? user.getDepartmentId().toString() : null
+        )));
     }
 }
