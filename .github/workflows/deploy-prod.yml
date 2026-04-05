@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     outputs:
-      previous_version: ${{ steps.save_version.outputs.previous }}
+      previous_version: ${{ steps.set_version.outputs.previous }}
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
@@ -40,9 +40,12 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          capture_stdout: true
           script: |
-            PREV=$(grep "IMAGE_TAG=" /opt/ai-hiring/docker/prod/.env 2>/dev/null | cut -d= -f2 || echo "unknown")
-            echo "previous=$PREV" >> $GITHUB_OUTPUT
+            grep "IMAGE_TAG=" /opt/ai-hiring/docker/prod/.env 2>/dev/null | cut -d= -f2 || echo "unknown"
+      - name: Set previous version output
+        id: set_version
+        run: echo "previous=${{ steps.save_version.outputs.stdout }}" >> "$GITHUB_OUTPUT"
       - name: Copy deploy scripts to VPS
         uses: appleboy/scp-action@v1
         with:
