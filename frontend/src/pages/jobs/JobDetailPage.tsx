@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   Descriptions, Tag, Select, Button, Form, Input, Divider, Alert,
   InputNumber, Spin, Table, Tooltip, Space, message,
@@ -23,6 +23,7 @@ const LLM_COLOR = (score: number) => score >= 80 ? 'green' : score >= 60 ? 'oran
 
 export default function JobDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [job, setJob] = useState<JobDetail | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [editing, setEditing] = useState(false);
@@ -34,10 +35,16 @@ export default function JobDetailPage() {
   const [topK, setTopK] = useState(10);
   const [matchResults, setMatchResults] = useState<MatchResultItem[] | null>(null);
   const [matchError, setMatchError] = useState<{ type: '422' | '503' | 'generic'; message: string } | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
-    getJob(id).then(setJob).catch(() => message.error('Failed to load job'));
+    setLoadError(null);
+    getJob(id).then(setJob).catch((e: unknown) => {
+      const msg = e instanceof Error ? e.message : 'Failed to load job';
+      setLoadError(msg);
+      message.error(msg);
+    });
     listDepartments().then(setDepartments).catch(() => {});
   }, [id]);
 
@@ -97,6 +104,15 @@ export default function JobDetailPage() {
       setMatchLoading(false);
     }
   };
+
+  if (loadError) {
+    return (
+      <div style={{ textAlign: 'center', padding: 48 }}>
+        <Alert type="error" message="Failed to load job" description={loadError} showIcon />
+        <Button style={{ marginTop: 16 }} onClick={() => navigate('/jobs')}>Back to Jobs</Button>
+      </div>
+    );
+  }
 
   if (!job) return <Spin />;
 
