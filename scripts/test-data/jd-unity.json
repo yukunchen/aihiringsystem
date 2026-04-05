@@ -1,0 +1,11 @@
+{
+  "title": "Unity 中高级开发工程师",
+  "description": "岗位职责：\n1. 负责 XR 应用的核心功能开发及性能优化，包括但不限于交互系统、渲染优化。\n2. 负责 Unity 应用架构迭代，主导应用内模块的建立和解耦，提高应用可靠性及工程可维护性。\n3. 与 Android 原生开发团队协作，处理 Unity 与 Android 平台的交互、原生插件开发与集成。\n4. 与产品、美术团队协作，提供符合产品需求的技术方案。\n\n职位要求：\n1. 本科及以上学历，3年以上 Unity 开发经验。\n2. 了解 Unity XR、Interaction Toolkit 等常见 Unity XR 开发 SDK。\n3. 熟练掌握 C# 语言，熟悉 C++ 语言。\n4. 掌握基本的计算机图形学知识，理解渲染管线流程、图形资源管理等。\n5. 精通 Unity 调试方法，具备 Unity 性能优化经验。\n\n加分项：\n1. 图形 API：了解 OpenGL ES、Vulkan 等图形 API。\n2. 参与并维护过 Unity XR SDK。",
+  "requirements": "本科及以上学历，3年以上Unity开发经验，熟悉C#和C++，了解Unity XR SDK，掌握计算机图形学基础知识",
+  "skills": "Unity, C#, C++, XR, Interaction Toolkit, OpenGL ES, Vulkan, 渲染管线, 性能优化",
+  "education": "本科及以上",
+  "experience": "3年以上Unity开发经验",
+  "salaryRange": "面议",
+  "location": "不限",
+  "departmentId": ""
+}
