@@ -1,6 +1,6 @@
 # Progress
 
-> 最后更新：2026-04-04
+> 最后更新：2026-04-05
 >
 > 供下一个 agent 接手时快速建立上下文。先读本文件，再读 CLAUDE.md，再看 PROJECT_MAP.md。
 
@@ -96,8 +96,10 @@ Production 手动部署 → (失败自动回滚 + 告警)
 | Staging 部署 | `.github/workflows/deploy-staging.yml` | ✅ | push master 自动部署 + Smoke Test + E2E + 失败建 Issue |
 | Prod 部署 | `.github/workflows/deploy-prod.yml` | ✅ | 手动触发，含自动回滚 + 失败告警 Issue |
 | verify-issue.sh | `scripts/verify-issue.sh` | ✅ | 接收 (issue_number, base_url, issue_body)，跑 auth+jobs+resume+AI health check |
+| verify-staging.sh | `scripts/verify-staging.sh` | ✅ | 真实数据端到端验证（JD 创建 + 简历上传 + 向量化 + AI 匹配） |
 | Branch 保护 | `scripts/setup-branch-protection.sh` | ✅ | CI 必须通过，enforce_admins=true，required_approving_review_count=0（允许 self-review） |
-| E2E 测试 | `e2e-tests/` | ⚠️ 部分 | 3/10 通过，7 个因 Ant Design Menu 选择器问题失败 |
+| E2E 测试 | `e2e-tests/` | ✅ | 10/10 通过（前端语义化导航修复后） |
+| 真实测试数据 | `trainingdata/` + `scripts/test-data/` | ✅ | 2 份简历 PDF + 1 份 JD PDF + 结构化 JD JSON |
 
 ### GitHub Secrets 清单
 
@@ -123,60 +125,90 @@ Production 手动部署 → (失败自动回滚 + 告警)
 
 ## E2E 测试状态
 
-### 文件结构
+### Playwright UI 测试（10/10 通过）
 
-```
-e2e-tests/
-  playwright.config.ts     — 配置：baseURL, setup→chromium 依赖链
-  tests/
-    auth.setup.ts          — 登录认证，生成 storageState
-    auth.spec.ts           — 登录/登出测试
-    job.spec.ts            — 职位列表/详情测试
-    resume.spec.ts         — 简历列表/上传测试
-    match.spec.ts          — AI 匹配触发测试
-```
+通过前端语义化 `<Link>` 修复（PR #41），所有 Playwright 测试通过：
+- `auth.setup.ts` ✅, `auth.spec.ts` ✅
+- `job.spec.ts` ✅ (4 tests), `resume.spec.ts` ✅ (3 tests)
+- `match.spec.ts` ✅
 
-### 当前测试结果（staging: 184.32.94.23:3002）
+### 真实数据端到端验证（scripts/verify-staging.sh）
 
-| 测试 | 状态 | 原因 |
+使用 `trainingdata/` 目录下的真实简历和 JD 验证完整业务流程：
+
+| 步骤 | 状态 | 说明 |
 |------|------|------|
-| auth.setup.ts >> authenticate | ✅ | 登录成功 |
-| auth.spec.ts >> should login with valid credentials | ✅ | 正常 |
-| auth.spec.ts >> should show error with invalid credentials | ✅ | 正常 |
-| auth.spec.ts >> should logout successfully | ❌ | 选择器问题 |
-| job.spec.ts (4 tests) | ❌ | Ant Design Menu 不是 `<a>` 标签，`getByRole('link')` 失败 |
-| resume.spec.ts (3 tests) | ❌ | 同上，导航选择器问题 |
-| match.spec.ts | ❌ | 同上 |
+| Auth 登录 | ✅ | |
+| 获取部门 | ❌ | API 返回格式问题 |
+| 创建 JD | ❌ | 依赖部门 |
+| 上传简历 (覃启航.pdf) | ✅ | |
+| 上传简历 (张芷菁.pdf) | ✅ | |
+| **简历向量化** | ❌ | 卡在 TEXT_EXTRACTED，不转为 AI_PROCESSED |
+| AI 匹配 | ⏭️ | 被向量化阻塞 |
 
-### 已知 E2E 问题
-
-**Ant Design Menu 选择器不兼容**：`<Menu.Item>` 渲染为 `<div>` 而非 `<a>`，导致 `getByRole('link', { name: /jobs/i })` 永远匹配不到。
-
-**修复方向**：
-- 用 `page.locator('.ant-menu-item').filter({ hasText: /jobs/i })` 或 `page.getByText(/jobs/i)` 替代 `getByRole('link')`
-- 同理 resume/match 的导航点击都需要改
+**核心发现**：staging 的简历向量化管线有问题 — 简历文本提取成功但无法推进到向量化步骤。
 
 ### Ant Design 选择器注意事项（给下一个 agent）
 
-1. **Form.Item 的 `name` prop 不会设到 `<input>` 上** — 用 `getByPlaceholder()` 而不是 `getByLabel()` 或 CSS `[name=...]`
-2. **Menu.Item 不是 `<a>` 标签** — 用 `.ant-menu-item` + text filter 或 `getByText()`
-3. **Alert 组件** — 用 `.ant-alert-error` 等类名选择器
-4. **Login 后跳转** — URL 匹配 `/.*\/(jobs|resumes).*/` 而非 `/dashboard`
+1. **Form.Item 的 `name` prop 不会设到 `<input>` 上** — 用 `getByPlaceholder()`
+2. **Menu 必须用 React Router `<Link>`** — 否则 `getByRole('link')` 不匹配
+3. **Select.Option 在 Ant Design v6 中废弃** — 必须用 `options` prop
+4. **Alert 组件** — 用 `.ant-alert-error` 等类名选择器
+
+---
+
+## Claude Code 自动化流程（2026-04-05 建立）
+
+### 架构：GitHub Actions + Claude Code 协同
+
+**GitHub Actions 负责**（需要 Runner 和事件触发）：
+- CI / Build / Deploy / AI Code Review / Issue Triage
+
+**Claude Code Session 负责**（CronCreate + Subagent）：
+- PR 合并监控（每 3 分钟）
+- autofix label issue 自动修复（subagent 处理）
+- Staging 部署结果监控
+- Production 部署触发（人工确认后）
+
+### 核心规则
+
+1. **Staging → Production 门禁**：Staging 部署后必须通过 Smoke + E2E，Production 不自动触发
+2. **autofix issue**：带 `autofix` label 的 issue 自动启动 subagent 修复 → 创建 PR → 等用户 review
+3. **创建 PR 前必须 rebase**：`git fetch origin && git rebase origin/master`
+4. **每次回复时先调用 Skill**：检查是否有适用的 skill
+
+### 当前 Cron 任务
+
+| 任务 | 频率 | 行为 |
+|------|------|------|
+| PR 合并检测 | 每 3 分钟 | 报告 staging 状态，不自动触发 prod |
+| autofix issue 检测 | 每 3 分钟 | 发现 autofix label → subagent 修复 → 创建 PR |
+
+### 真实测试数据
+
+```
+trainingdata/
+  覃启航.pdf                    — 候选人简历（Unity 开发经验）
+  张芷菁.pdf                    — 候选人简历（机器学习/Unity 方向）
+  Unity 中高级开发工程师.pdf      — JD（XR + Unity + C#）
+
+scripts/test-data/
+  jd-unity.json                 — 结构化 JD 数据（从 PDF 提取）
+```
 
 ---
 
 ## Staging 最近一次部署结果
 
-**Run ID**: 23980487233
+**Run ID**: 23991016083 (PR #50 合并后)
 
 | 阶段 | 结果 |
 |------|------|
 | CI | ✅ 全部通过 |
 | Build + Push | ✅ |
 | Deploy | ✅ |
-| Smoke Test (verify) | ✅ Login ✅, Resume upload ✅, Jobs list ✅ |
-| E2E | ⚠️ 3 passed / 7 failed |
-| report-failure | 创建了 E2E 失败 Issue |
+| Smoke Test (verify) | ✅ |
+| E2E | ✅ 10/10 通过 |
 
 ---
 
@@ -197,13 +229,12 @@ Production 不自动部署，需要手动触发：
 
 ## 当前未解决问题
 
-### P1 — E2E 测试修复
+### P1 — Staging 向量化管线故障
 
-**7 个测试因 Ant Design Menu 选择器失败**。需要将 `getByRole('link')` 替换为兼容 Ant Design 的选择器。涉及文件：
-- `e2e-tests/tests/job.spec.ts`
-- `e2e-tests/tests/resume.spec.ts`
-- `e2e-tests/tests/match.spec.ts`
-- `e2e-tests/tests/auth.spec.ts`（logout 相关）
+**真实数据验证发现**：简历上传后文本提取成功（TEXT_EXTRACTED），但无法推进到 AI 向量化（AI_PROCESSED）。
+- 一份简历变为 VECTORIZATION_FAILED，其余卡在 TEXT_EXTRACTED
+- 可能原因：AI 服务到 Qdrant 的连接问题，或 OPENAI_API_KEY 配置问题
+- 验证脚本：`scripts/verify-staging.sh http://184.32.94.23:8082 trainingdata/`
 
 ### P2 — 功能未实现
 
@@ -211,10 +242,9 @@ Production 不自动部署，需要手动触发：
 - `ResumeSource.BOSS` 枚举值存在，但无 API 客户端、OAuth 流程或同步逻辑
 - 相关 API 端点在 CLAUDE.md 中定义但未实现
 
-### P3 — 验证/运维
+### P3 — JD 创建 API 问题
 
-- Qdrant 在 staging 是否正常工作未端到端验证
-- Production 尚未部署过
+**真实数据验证发现**：通过 API 创建 JD 时 departments 接口返回格式不匹配，导致无法创建真实 JD 进行匹配测试。
 
 ---
 
@@ -238,10 +268,10 @@ curl -s http://184.32.94.23:8082/api/auth/login \
 
 | 优先级 | 问题 | 说明 |
 |--------|------|------|
-| P1 | 修复 E2E 测试选择器 | 7 个测试需要改用 `getByText()` 或 `.ant-menu-item` 选择器 |
+| P1 | 排查 Staging 向量化管线 | 简历卡在 TEXT_EXTRACTED，不转为 AI_PROCESSED |
 | P2 | Boss 直聘集成 | 大功能，需要设计 OAuth 流程 |
-| P3 | Staging E2E 完整验证 | Qdrant + 向量化 + 匹配端到端 |
-| P3 | Production 首次部署 | 手动 workflow_dispatch |
+| P3 | JD 创建 API 接口修复 | departments 返回格式不匹配 |
+| P3 | Production 首次完整验证 | 用真实数据验证完整流程 |
 
 ### 第 4 步 — 工作流程
 
@@ -298,3 +328,28 @@ AI 匹配正常工作需要：
 - 修正 Ant Design 选择器（getByPlaceholder 代替 input[name]）
 - 正确配置 TEST_USERNAME/TEST_PASSWORD secrets
 - 3/10 E2E 测试通过（auth.setup + 登录成功 + 登录失败）
+
+### ✅ 前端语义化导航修复（2026-04-05）
+- Menu 的 `onClick + navigate()` 改为 React Router `<Link>`，渲染 `<a>` 标签
+- E2E 测试从 3/10 提升到 10/10
+- PR #41
+
+### ✅ E2E 测试条件判断修复（2026-04-05）
+- `match.spec.ts`/`job.spec.ts` 改用 `isVisible({ timeout }).catch(() => false)` 处理空表格
+- PR #43
+
+### ✅ Production 部署修复（2026-04-05）
+- 修复 `$GITHUB_OUTPUT` 在 SSH 会话不可用的问题（用 `capture_stdout` + `head -1`）
+- Production 首次成功部署
+- PR #45, #47
+
+### ✅ Issue #49 自动修复（2026-04-05）
+- 问题：JD 创建 submit 按钮无反应
+- 原因：Ant Design v6 中 `Select.Option` 渲染为 null
+- 修复：改用 `options` prop
+- PR #50（通过 autofix cron + subagent 自动完成）
+
+### ✅ 真实数据 E2E 验证（2026-04-05）
+- 创建 `scripts/verify-staging.sh` 用真实简历和 JD 做端到端验证
+- 发现 staging 向量化管线问题（简历卡在 TEXT_EXTRACTED）
+- PR #54
