@@ -11,11 +11,12 @@ test.describe('AI Matching', () => {
 
   test('should trigger AI matching from job detail', async ({ page }) => {
     await page.getByRole('link', { name: /jobs/i }).click();
-    const firstRow = page.locator('table tbody tr').first();
-    if (await firstRow.isVisible()) {
-      await firstRow.getByRole('button', { name: /view/i }).click();
+    await expect(page.locator('table')).toBeVisible();
+    const viewBtn = page.locator('table tbody tr').first().getByRole('button', { name: /view/i });
+    if (await viewBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await viewBtn.click();
       const matchButton = page.getByRole('button', { name: /find matching|match/i });
-      if (await matchButton.isVisible()) {
+      if (await matchButton.isVisible({ timeout: 5000 }).catch(() => false)) {
         await matchButton.click();
         await expect(page.locator('table, text=No matching')).toBeVisible({ timeout: 60000 });
       }

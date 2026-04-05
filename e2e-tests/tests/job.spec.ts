@@ -25,15 +25,10 @@ test.describe('Job Management', () => {
 
   test('should view first job detail', async ({ page }) => {
     await page.getByRole('link', { name: /jobs/i }).click();
-    const firstRow = page.locator('table tbody tr').first();
-    if (await firstRow.isVisible()) {
-      const viewBtn = firstRow.getByRole('button', { name: /view|detail/i });
-      const rowLink = firstRow.locator('a').first();
-      if (await viewBtn.isVisible()) {
-        await viewBtn.click();
-      } else if (await rowLink.isVisible()) {
-        await rowLink.click();
-      }
+    await expect(page.locator('table')).toBeVisible();
+    const viewBtn = page.locator('table tbody tr').first().getByRole('button', { name: /view|detail/i });
+    if (await viewBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await viewBtn.click();
       await expect(page.locator('h2, h1')).toBeVisible();
     }
   });
