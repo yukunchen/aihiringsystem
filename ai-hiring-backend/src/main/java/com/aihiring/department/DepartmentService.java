@@ -33,10 +33,12 @@ public class DepartmentService {
         return departmentRepository.save(department);
     }
 
+    @Transactional(readOnly = true)
     public List<Department> getAllDepartments() {
         return departmentRepository.findAll();
     }
 
+    @Transactional(readOnly = true)
     public Department getDepartmentById(UUID id) {
         return departmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Department not found"));
@@ -91,6 +93,7 @@ public class DepartmentService {
         departmentRepository.delete(department);
     }
 
+    @Transactional(readOnly = true)
     public List<DepartmentResponse> getDepartmentTree() {
         List<Department> roots = departmentRepository.findByParentIsNull();
         return roots.stream()
