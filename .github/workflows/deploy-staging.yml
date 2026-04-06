@@ -137,7 +137,22 @@ jobs:
             fi
           fi
 
-          # 3. Jobs list
+          # 3. Departments list
+          if [ -n "$TOKEN" ]; then
+            DEPTS=$(curl -sf "$BASE/api/departments" \
+              -H "Authorization: Bearer $TOKEN" || echo '{}')
+            DCODE=$(echo "$DEPTS" | python3 -c "import sys,json; print(json.load(sys.stdin).get('code',''))" 2>/dev/null)
+            DCOUNT=$(echo "$DEPTS" | python3 -c "import sys,json; d=json.load(sys.stdin).get('data',[]); print(len(d))" 2>/dev/null)
+            DNAMES=$(echo "$DEPTS" | python3 -c "import sys,json; d=json.load(sys.stdin).get('data',[]); print(', '.join(x.get('name','') for x in d))" 2>/dev/null)
+            if [ "$DCODE" = "200" ] && [ "$DCOUNT" -gt 0 ] 2>/dev/null; then
+              DETAILS="${DETAILS}\n- ✅ Departments list ($DCOUNT: $DNAMES)"
+            else
+              PASS=false
+              DETAILS="${DETAILS}\n- ❌ Departments list (code=$DCODE, count=$DCOUNT)"
+            fi
+          fi
+
+          # 4. Jobs list
           if [ -n "$TOKEN" ]; then
             JOBS=$(curl -sf "$BASE/api/jobs" \
               -H "Authorization: Bearer $TOKEN" || echo '{}')
