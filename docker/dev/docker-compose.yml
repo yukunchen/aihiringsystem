@@ -10,7 +10,7 @@ services:
       - VITE_API_BASE_URL=/api
     restart: unless-stopped
     networks:
-      - ai-hiring-network
+      - dev-internal
   backend:
     image: ${REGISTRY}/${IMAGE_PREFIX}/ai-hiring-backend:${IMAGE_TAG}
     ports:
@@ -29,6 +29,7 @@ services:
       - ai-matching
     restart: unless-stopped
     networks:
+      - dev-internal
       - ai-hiring-network
   ai-matching:
     image: ${REGISTRY}/${IMAGE_PREFIX}/ai-matching-service:${IMAGE_TAG}
@@ -42,8 +43,10 @@ services:
       - QDRANT_PORT=${QDRANT_PORT}
     restart: unless-stopped
     networks:
+      - dev-internal
       - ai-hiring-network
 
 networks:
+  dev-internal:
   ai-hiring-network:
     external: true
