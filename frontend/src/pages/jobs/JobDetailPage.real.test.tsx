@@ -49,7 +49,9 @@ function renderDetailPage() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(jobsApi.getJob).mockResolvedValue(realBackendResponse as any);
+  vi.mocked(jobsApi.getJob).mockResolvedValue(
+    realBackendResponse as import('../../api/jobs').JobDetail,
+  );
   vi.mocked(deptApi.listDepartments).mockResolvedValue([{ id: 'd1', name: 'Engineering' }]);
   vi.mocked(matchApi.match).mockResolvedValue({ jobId: 'j1', results: [] });
 });
