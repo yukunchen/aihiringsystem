@@ -24,6 +24,8 @@ const realBackendResponse = {
   id: 'j1',
   title: 'Backend Engineer',
   department: { id: 'd1', name: 'Engineering' },
+  departmentId: 'd1',
+  departmentName: 'Engineering',
   createdBy: { id: 'u1', username: 'admin' },
   status: 'DRAFT',
   createdAt: '2026-03-01T00:00:00Z',
