@@ -74,4 +74,20 @@ describe('JobCreatePage', () => {
 
     await waitFor(() => expect(screen.getByText('Title is required')).toBeInTheDocument());
   });
+
+  it('stays on form when createJob throws a generic error', async () => {
+    vi.mocked(jobsApi.createJob).mockRejectedValueOnce(new Error('Internal Server Error'));
+
+    render(<MemoryRouter><JobCreatePage /></MemoryRouter>);
+    await waitFor(() => screen.getByText('Engineering'));
+
+    await userEvent.type(screen.getByPlaceholderText(/title/i), 'Test Job');
+    await userEvent.click(screen.getByRole('combobox'));
+    await userEvent.click(screen.getByText('Engineering'));
+    await userEvent.type(screen.getByPlaceholderText(/description/i), 'Test desc');
+    await userEvent.click(screen.getByRole('button', { name: /submit/i }));
+
+    await waitFor(() => expect(jobsApi.createJob).toHaveBeenCalled());
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
 });
