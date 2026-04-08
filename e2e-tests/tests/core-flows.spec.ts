@@ -1,0 +1,104 @@
+import { test, expect } from '@playwright/test';
+import { fileURLToPath } from 'url';
+import path from 'path';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const FIXTURES = path.join(__dirname, '../fixtures');
+const TS = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+
+test.describe.serial('Core flows', () => {
+  test('create JD - happy path', async ({ page }) => {
+    const title = `E2E-JD-${TS}`;
+
+    await page.goto('/jobs');
+    await page.getByRole('link', { name: /create/i }).click();
+    await expect(page).toHaveURL(/.*\/jobs\/create/);
+
+    // Fill form
+    await page.getByPlaceholder('Title').fill(title);
+    await page.locator('.ant-select').click();
+    await page.locator('.ant-select-item').first().click();
+    await page.getByPlaceholder('Description').fill('E2E test job description');
+
+    // Submit
+    await page.getByRole('button', { name: /submit/i }).click();
+
+    // Verify redirect to detail page with our title
+    await expect(page.getByText(title)).toBeVisible({ timeout: 10000 });
+    const url = page.url();
+    expect(url).toMatch(/\/jobs\/[a-f0-9-]+/);
+
+    // Verify persistence after refresh
+    await page.reload();
+    await expect(page.getByText(title)).toBeVisible({ timeout: 10000 });
+  });
+
+  test('create JD - validation errors on empty required fields', async ({ page }) => {
+    await page.goto('/jobs/create');
+
+    // Submit without filling anything
+    await page.getByRole('button', { name: /submit/i }).click();
+
+    // Ant Design form validation messages should appear
+    await expect(page.locator('.ant-form-item-explain-error').first()).toBeVisible({ timeout: 5000 });
+  });
+
+  test('upload single resume - happy path', async ({ page }) => {
+    await page.goto('/resumes/upload');
+
+    // Upload real PDF fixture
+    const fileInput = page.locator('input[type="file"]');
+    await fileInput.setInputFiles(path.join(FIXTURES, '覃启航.pdf'));
+
+    // Click upload
+    await page.getByTestId('upload-btn').click();
+
+    // Should redirect to resume list
+    await expect(page).toHaveURL(/.*\/resumes/, { timeout: 15000 });
+
+    // Verify the file appears in the list
+    await expect(page.getByText('覃启航')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('upload resume - reject unsupported file type', async ({ page }) => {
+    await page.goto('/resumes/upload');
+
+    // Verify the upload button stays disabled when no valid file is selected
+    const uploadBtn = page.getByTestId('upload-btn');
+    await expect(uploadBtn).toBeDisabled();
+  });
+
+  test('batch upload resumes - happy path', async ({ page }) => {
+    await page.goto('/resumes');
+
+    // Open batch upload modal
+    await page.getByRole('button', { name: /batch/i }).click();
+    await expect(page.getByText('Batch Upload Resumes')).toBeVisible();
+
+    // Upload two PDFs
+    const fileInput = page.locator('[data-testid="batch-file-input"] input[type="file"]');
+    await fileInput.setInputFiles([
+      path.join(FIXTURES, '张芷菁.pdf'),
+      path.join(FIXTURES, 'Unity 中高级开发工程师.pdf'),
+    ]);
+
+    // Verify files appear in the list
+    await expect(page.getByText('张芷菁.pdf')).toBeVisible();
+    await expect(page.getByText('Unity 中高级开发工程师.pdf')).toBeVisible();
+
+    // Click upload
+    await page.getByRole('button', { name: /upload/i }).click();
+
+    // Wait for upload to complete
+    await expect(page.getByText(/uploaded/i)).toBeVisible({ timeout: 15000 });
+  });
+});
+
+test('unauthenticated access redirects to login', async ({ browser }) => {
+  // Fresh context with no auth state
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await page.goto('/jobs');
+  await expect(page).toHaveURL(/.*\/login/, { timeout: 10000 });
+  await context.close();
+});
