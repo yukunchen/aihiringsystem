@@ -94,6 +94,39 @@ test.describe.serial('Core flows', () => {
   });
 });
 
+test.describe('Page rendering', () => {
+  test('login page displays correctly', async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.goto('/login');
+    await expect(page.getByPlaceholder('Username')).toBeVisible();
+    await expect(page.getByPlaceholder('Password')).toBeVisible();
+    await expect(page.getByRole('button', { name: /login/i })).toBeVisible();
+    await context.close();
+  });
+
+  test('login with invalid credentials shows error', async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.goto('/login');
+    await page.getByPlaceholder('Username').fill('wrong');
+    await page.getByPlaceholder('Password').fill('wrong');
+    await page.getByRole('button', { name: /login/i }).click();
+    await expect(page.locator('.ant-message-error, .ant-alert-error, [role="alert"]')).toBeVisible({ timeout: 10000 });
+    await context.close();
+  });
+
+  test('job list page renders', async ({ page }) => {
+    await page.goto('/jobs');
+    await expect(page.locator('.ant-table, [class*="job"]')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('resume list page renders', async ({ page }) => {
+    await page.goto('/resumes');
+    await expect(page.locator('.ant-table, [class*="resume"]')).toBeVisible({ timeout: 10000 });
+  });
+});
+
 test('unauthenticated access redirects to login', async ({ browser }) => {
   // Fresh context with no auth state
   const context = await browser.newContext();
