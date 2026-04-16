@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Form, Input, Select, Button } from 'antd';
+import { Form, Input, Select, Button, message } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { createJob, type CreateJobRequest } from '../../api/jobs';
 import { listDepartments, type Department } from '../../api/departments';
@@ -26,6 +26,8 @@ export default function JobCreatePage() {
         form.setFields(
           Object.entries(fieldErrors).map(([name, errors]) => ({ name, errors: [errors] }))
         );
+      } else {
+        message.error(e instanceof Error ? e.message : 'Failed to create job');
       }
     } finally {
       setLoading(false);
