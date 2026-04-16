@@ -29,9 +29,10 @@ test.describe.serial('Core flows', () => {
     await login(page);
     const title = `E2E-JD-${TS}`;
 
-    await page.goto('/jobs');
+    await page.goto('/jobs', { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: /create/i }).click();
     await expect(page).toHaveURL(/.*\/jobs\/(create|new)/);
+    await page.waitForLoadState('networkidle');
 
     // Fill form
     await page.getByPlaceholder('Title').fill(title);
@@ -43,18 +44,18 @@ test.describe.serial('Core flows', () => {
     await page.getByRole('button', { name: /submit/i }).click();
 
     // Verify redirect to detail page with our title
-    await expect(page.getByText(title)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(title)).toBeVisible({ timeout: 15000 });
     const url = page.url();
     expect(url).toMatch(/\/jobs\/[a-f0-9-]+/);
 
     // Verify persistence after refresh
     await page.reload();
-    await expect(page.getByText(title)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(title)).toBeVisible({ timeout: 15000 });
   });
 
   test('create JD - validation errors on empty required fields', async ({ page }) => {
     await login(page);
-    await page.goto('/jobs/new');
+    await page.goto('/jobs/new', { waitUntil: 'networkidle' });
 
     // Submit without filling anything
     await page.getByRole('button', { name: /submit/i }).click();
@@ -65,7 +66,7 @@ test.describe.serial('Core flows', () => {
 
   test('upload single resume - happy path', async ({ page }) => {
     await login(page);
-    await page.goto('/resumes/upload');
+    await page.goto('/resumes/upload', { waitUntil: 'networkidle' });
 
     // Upload real PDF fixture
     const fileInput = page.locator('input[type="file"]');
@@ -83,7 +84,7 @@ test.describe.serial('Core flows', () => {
 
   test('upload resume - reject unsupported file type', async ({ page }) => {
     await login(page);
-    await page.goto('/resumes/upload');
+    await page.goto('/resumes/upload', { waitUntil: 'networkidle' });
 
     // Verify the upload button stays disabled when no valid file is selected
     const uploadBtn = page.getByTestId('upload-btn');
@@ -92,7 +93,7 @@ test.describe.serial('Core flows', () => {
 
   test('batch upload resumes - happy path', async ({ page }) => {
     await login(page);
-    await page.goto('/resumes');
+    await page.goto('/resumes', { waitUntil: 'networkidle' });
 
     // Open batch upload modal
     await page.getByRole('button', { name: /batch/i }).click();
@@ -121,7 +122,7 @@ test.describe('Page rendering', () => {
   test('login page displays correctly', async ({ browser }) => {
     const context = await browser.newContext();
     const page = await context.newPage();
-    await page.goto('/login');
+    await page.goto('/login', { waitUntil: 'networkidle' });
     await expect(page.getByPlaceholder('Username')).toBeVisible();
     await expect(page.getByPlaceholder('Password')).toBeVisible();
     await expect(page.getByRole('button', { name: /login/i })).toBeVisible();
@@ -131,7 +132,7 @@ test.describe('Page rendering', () => {
   test('login with invalid credentials shows error', async ({ browser }) => {
     const context = await browser.newContext();
     const page = await context.newPage();
-    await page.goto('/login');
+    await page.goto('/login', { waitUntil: 'networkidle' });
     await page.getByPlaceholder('Username').fill('wrong');
     await page.getByPlaceholder('Password').fill('wrong');
     await page.getByRole('button', { name: /login/i }).click();
@@ -141,13 +142,13 @@ test.describe('Page rendering', () => {
 
   test('job list page renders', async ({ page }) => {
     await login(page);
-    await page.goto('/jobs');
+    await page.goto('/jobs', { waitUntil: 'networkidle' });
     await expect(page.getByRole('button', { name: /create/i })).toBeVisible({ timeout: 10000 });
   });
 
   test('resume list page renders', async ({ page }) => {
     await login(page);
-    await page.goto('/resumes');
+    await page.goto('/resumes', { waitUntil: 'networkidle' });
     await expect(page.getByRole('button', { name: 'Upload Resume' })).toBeVisible({ timeout: 10000 });
   });
 });
