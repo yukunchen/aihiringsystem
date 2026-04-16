@@ -9,17 +9,21 @@ const TS = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 async function login(page: Page) {
   for (let attempt = 0; attempt < 3; attempt++) {
     await page.goto('/login');
+    await expect(page.getByPlaceholder('Username')).toBeVisible({ timeout: 5000 });
     await page.getByPlaceholder('Username').fill(process.env.TEST_USERNAME || 'admin');
     await page.getByPlaceholder('Password').fill(process.env.TEST_PASSWORD || 'admin123');
     await page.getByRole('button', { name: /login/i }).click();
     try {
-      await expect(page).toHaveURL(/.*\/(jobs|resumes)/, { timeout: 10000 });
+      await page.waitForURL(/.*\/(jobs|resumes|dashboard)/, { timeout: 15000 });
+      // Verify we actually left the login page
+      await expect(page.getByPlaceholder('Username')).not.toBeVisible({ timeout: 3000 });
       return; // success
     } catch {
-      if (attempt < 2) await page.waitForTimeout(1000); // retry on server error
+      if (attempt < 2) await page.waitForTimeout(2000);
     }
   }
-  throw new Error('Login failed after 3 attempts');
+  const url = page.url();
+  throw new Error(`Login failed after 3 attempts. Current URL: ${url}`);
 }
 
 test.describe.serial('Core flows', () => {
@@ -146,7 +150,7 @@ test.describe('Page rendering', () => {
   test('resume list page renders', async ({ page }) => {
     await login(page);
     await page.goto('/resumes');
-    await expect(page.getByRole('button', { name: /upload/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('button', { name: 'Upload Resume' })).toBeVisible({ timeout: 10000 });
   });
 });
 
