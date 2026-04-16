@@ -75,7 +75,7 @@ describe('JobCreatePage', () => {
     await waitFor(() => expect(screen.getByText('Title is required')).toBeInTheDocument());
   });
 
-  it('stays on form when createJob throws a generic error', async () => {
+  it('shows error message and stays on form when createJob throws a generic error', async () => {
     vi.mocked(jobsApi.createJob).mockRejectedValueOnce(new Error('Internal Server Error'));
 
     render(<MemoryRouter><JobCreatePage /></MemoryRouter>);
@@ -88,6 +88,7 @@ describe('JobCreatePage', () => {
     await userEvent.click(screen.getByRole('button', { name: /submit/i }));
 
     await waitFor(() => expect(jobsApi.createJob).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByText('Internal Server Error')).toBeInTheDocument());
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 });

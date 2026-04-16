@@ -92,6 +92,30 @@ class JobServiceTest {
     }
 
     @Test
+    void create_withSkills_shouldStoreSkillsAsPlainText() {
+        Department dept = createDepartment();
+        User user = createUser();
+        CreateJobRequest request = new CreateJobRequest();
+        request.setTitle("Backend Developer");
+        request.setDescription("Looking for a backend developer");
+        request.setSkills("Java, Python, SQL");
+        request.setDepartmentId(dept.getId());
+
+        when(departmentRepository.findById(dept.getId())).thenReturn(Optional.of(dept));
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(jobRepository.save(any(JobDescription.class))).thenAnswer(i -> {
+            JobDescription j = i.getArgument(0);
+            j.setId(UUID.randomUUID());
+            return j;
+        });
+
+        JobDescription result = jobService.create(request, user.getId());
+
+        assertEquals("Java, Python, SQL", result.getSkills());
+        verify(jobRepository).save(any(JobDescription.class));
+    }
+
+    @Test
     void create_withNonExistentDepartment_shouldThrowResourceNotFoundException() {
         UUID deptId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();

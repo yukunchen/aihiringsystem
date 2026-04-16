@@ -7,9 +7,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.JdbcType;
-import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.dialect.PostgreSQLEnumJdbcType;
-import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "job_descriptions")
@@ -26,8 +24,7 @@ public class JobDescription extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String requirements;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "jsonb")
+    @Column(columnDefinition = "TEXT")
     private String skills;
 
     @Column(length = 50)
