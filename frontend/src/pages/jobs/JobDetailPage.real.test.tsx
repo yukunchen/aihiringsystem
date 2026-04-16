@@ -81,12 +81,11 @@ describe('JobDetailPage with REAL backend response', () => {
 
   it('should NOT be stuck on loading spinner', async () => {
     renderDetailPage();
-    // Wait for the page to finish loading
+    // Wait for the title to appear (proves loading completed)
     await waitFor(() => {
-      // The spinner should be gone
-      expect(screen.queryByRole('img', { name: /loading/i })).not.toBeInTheDocument();
+      expect(screen.getByText('Backend Engineer')).toBeInTheDocument();
     }, { timeout: 5000 });
-    // The title should be visible
-    expect(screen.getByText('Backend Engineer')).toBeInTheDocument();
+    // The spinner should be gone once content is loaded
+    expect(screen.queryByText(/loading/i)).not.toBeInTheDocument();
   });
 });
