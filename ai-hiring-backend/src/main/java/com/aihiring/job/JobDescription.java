@@ -27,10 +27,10 @@ public class JobDescription extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String skills;
 
-    @Column(length = 50)
+    @Column(columnDefinition = "TEXT")
     private String education;
 
-    @Column(length = 50)
+    @Column(columnDefinition = "TEXT")
     private String experience;
 
     @Column(name = "salary_range", length = 100)
