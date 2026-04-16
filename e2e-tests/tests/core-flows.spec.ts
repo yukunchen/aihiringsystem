@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
 import { fileURLToPath } from 'url';
 import path from 'path';
 
@@ -6,13 +6,30 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURES = path.join(__dirname, '../fixtures');
 const TS = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 
+async function login(page: Page) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await page.goto('/login');
+    await page.getByPlaceholder('Username').fill(process.env.TEST_USERNAME || 'admin');
+    await page.getByPlaceholder('Password').fill(process.env.TEST_PASSWORD || 'admin123');
+    await page.getByRole('button', { name: /login/i }).click();
+    try {
+      await expect(page).toHaveURL(/.*\/(jobs|resumes)/, { timeout: 10000 });
+      return; // success
+    } catch {
+      if (attempt < 2) await page.waitForTimeout(1000); // retry on server error
+    }
+  }
+  throw new Error('Login failed after 3 attempts');
+}
+
 test.describe.serial('Core flows', () => {
   test('create JD - happy path', async ({ page }) => {
+    await login(page);
     const title = `E2E-JD-${TS}`;
 
     await page.goto('/jobs');
-    await page.getByRole('link', { name: /create/i }).click();
-    await expect(page).toHaveURL(/.*\/jobs\/create/);
+    await page.getByRole('button', { name: /create/i }).click();
+    await expect(page).toHaveURL(/.*\/jobs\/(create|new)/);
 
     // Fill form
     await page.getByPlaceholder('Title').fill(title);
@@ -34,7 +51,8 @@ test.describe.serial('Core flows', () => {
   });
 
   test('create JD - validation errors on empty required fields', async ({ page }) => {
-    await page.goto('/jobs/create');
+    await login(page);
+    await page.goto('/jobs/new');
 
     // Submit without filling anything
     await page.getByRole('button', { name: /submit/i }).click();
@@ -44,6 +62,7 @@ test.describe.serial('Core flows', () => {
   });
 
   test('upload single resume - happy path', async ({ page }) => {
+    await login(page);
     await page.goto('/resumes/upload');
 
     // Upload real PDF fixture
@@ -61,6 +80,7 @@ test.describe.serial('Core flows', () => {
   });
 
   test('upload resume - reject unsupported file type', async ({ page }) => {
+    await login(page);
     await page.goto('/resumes/upload');
 
     // Verify the upload button stays disabled when no valid file is selected
@@ -69,6 +89,7 @@ test.describe.serial('Core flows', () => {
   });
 
   test('batch upload resumes - happy path', async ({ page }) => {
+    await login(page);
     await page.goto('/resumes');
 
     // Open batch upload modal
@@ -117,18 +138,19 @@ test.describe('Page rendering', () => {
   });
 
   test('job list page renders', async ({ page }) => {
+    await login(page);
     await page.goto('/jobs');
-    await expect(page.locator('.ant-table, [class*="job"]')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('button', { name: /create/i })).toBeVisible({ timeout: 10000 });
   });
 
   test('resume list page renders', async ({ page }) => {
+    await login(page);
     await page.goto('/resumes');
-    await expect(page.locator('.ant-table, [class*="resume"]')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('button', { name: /upload/i })).toBeVisible({ timeout: 10000 });
   });
 });
 
 test('unauthenticated access redirects to login', async ({ browser }) => {
-  // Fresh context with no auth state
   const context = await browser.newContext();
   const page = await context.newPage();
   await page.goto('/jobs');

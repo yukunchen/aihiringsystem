@@ -43,6 +43,25 @@ REST APIs under `/api/` prefix:
 
 JWT-based: access token (2h TTL) + refresh token (7d TTL).
 
+## Debugging Rules
+
+- **同方向连续失败 2 次，必须停下来换方向。** 不要在同一个假设上尝试第 3 次。
+- **HTTP 403/500 先查日志，不要猜。** 运行 `docker logs <container>` 看实际异常，再决定修什么。
+- **修 bug 前先做对比测试。** 同类端点是否也失败？如果只有一个端点失败，问题在该端点的代码，不在通用层（权限、认证、数据库）。
+- **永远通过前端代理验证，不要只测直连端口。** 用户访问的是 nginx 代理路径，直连 backend 端口能通不代表用户能用。
+
+## Deployment Rules
+
+- 使用 `docker compose down && docker compose up -d` 而非 `docker compose restart`，确保环境变量和新镜像生效。
+- dev/staging/prod 使用独立的 Docker 内部网络，禁止共享网络导致 DNS 冲突。
+- 部署后必须通过前端端口验证，不能只验证 backend 直连端口。
+
+## Git Workflow
+
+- 永远不要直接 push 到 master。必须创建 feature branch 并开 PR。
+- 永远不要自行 merge PR。等用户 review 后由用户 merge。
+- commit 只包含当前任务相关的文件，不要捆绑无关改动。
+
 ## Execution Principles
 
 - Prefer minimal, reversible changes.
