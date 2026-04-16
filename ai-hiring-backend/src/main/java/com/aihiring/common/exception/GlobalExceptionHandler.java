@@ -46,7 +46,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ApiResponse<Void>> handleMaxUploadSize(MaxUploadSizeExceededException ex) {
         return ResponseEntity.badRequest()
-                .body(ApiResponse.error(400, "File size exceeds maximum of 10MB"));
+                .body(ApiResponse.error(400, "Upload size exceeds limit: individual file max 10MB, batch max 200MB"));
     }
 
     @ExceptionHandler(Exception.class)

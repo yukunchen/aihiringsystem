@@ -53,9 +53,10 @@ export function BatchUploadModal({ open, onClose, onSuccess }: BatchUploadModalP
         prev.map((f) => {
           const r = resultMap.get(f.file.name);
           if (!r) return { ...f, status: 'error' as const, error: 'No result returned' };
+          const succeeded = r.status === 'UPLOADED' || r.status === 'TEXT_EXTRACTED';
           return {
             ...f,
-            status: r.status === 'UPLOADED' ? ('done' as const) : ('error' as const),
+            status: succeeded ? ('done' as const) : ('error' as const),
             error: r.error ?? undefined,
             result: r,
           };

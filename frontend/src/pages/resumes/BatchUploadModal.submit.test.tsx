@@ -22,7 +22,7 @@ describe('BatchUploadModal submit flow', () => {
     vi.mocked(resumesApi.uploadResumes).mockResolvedValueOnce({
       total: 2, succeeded: 2, failed: 0,
       results: [
-        { originalIndex: 0, fileName: 'a.pdf', status: 'UPLOADED', resumeId: 'r1', error: null },
+        { originalIndex: 0, fileName: 'a.pdf', status: 'TEXT_EXTRACTED', resumeId: 'r1', error: null },
         { originalIndex: 1, fileName: 'b.pdf', status: 'UPLOADED', resumeId: 'r2', error: null },
       ],
     });
