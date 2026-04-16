@@ -91,7 +91,7 @@ test.describe.serial('Core flows', () => {
     await expect(uploadBtn).toBeDisabled();
   });
 
-  test('batch upload resumes - happy path', async ({ page }) => {
+  test('batch upload resumes - 3 PDFs', async ({ page }) => {
     await login(page);
     await page.goto('/resumes', { waitUntil: 'networkidle' });
 
@@ -99,22 +99,24 @@ test.describe.serial('Core flows', () => {
     await page.getByRole('button', { name: /batch/i }).click();
     await expect(page.getByText('Batch Upload Resumes')).toBeVisible();
 
-    // Upload two PDFs
-    const fileInput = page.locator('[data-testid="batch-file-input"] input[type="file"]');
-    await fileInput.setInputFiles([
+    // Upload 3 PDFs via the Ant Design Upload.Dragger file input
+    const fileInput = page.locator('.ant-upload input[type="file"]');
+    await fileInput.first().setInputFiles([
+      path.join(FIXTURES, '覃启航.pdf'),
       path.join(FIXTURES, '张芷菁.pdf'),
       path.join(FIXTURES, 'Unity 中高级开发工程师.pdf'),
     ]);
 
     // Verify files appear in the list
+    await expect(page.getByText('覃启航.pdf')).toBeVisible();
     await expect(page.getByText('张芷菁.pdf')).toBeVisible();
     await expect(page.getByText('Unity 中高级开发工程师.pdf')).toBeVisible();
 
     // Click upload
-    await page.getByRole('button', { name: /upload/i }).click();
+    await page.getByRole('button', { name: /upload/i }).last().click();
 
-    // Wait for upload to complete
-    await expect(page.getByText(/uploaded/i)).toBeVisible({ timeout: 15000 });
+    // Wait for success toast
+    await expect(page.getByText(/uploaded 3\/3/i)).toBeVisible({ timeout: 30000 });
   });
 });
 
