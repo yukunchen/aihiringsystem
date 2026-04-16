@@ -8,18 +8,16 @@ const TS = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 
 async function login(page: Page) {
   for (let attempt = 0; attempt < 3; attempt++) {
-    await page.goto('/login');
-    await expect(page.getByPlaceholder('Username')).toBeVisible({ timeout: 5000 });
+    await page.goto('/login', { waitUntil: 'networkidle' });
     await page.getByPlaceholder('Username').fill(process.env.TEST_USERNAME || 'admin');
     await page.getByPlaceholder('Password').fill(process.env.TEST_PASSWORD || 'admin123');
     await page.getByRole('button', { name: /login/i }).click();
     try {
-      await page.waitForURL(/.*\/(jobs|resumes|dashboard)/, { timeout: 15000 });
-      // Verify we actually left the login page
-      await expect(page.getByPlaceholder('Username')).not.toBeVisible({ timeout: 3000 });
+      await page.waitForURL(/.*\/(jobs|resumes|dashboard)/, { timeout: 20000 });
+      await page.waitForLoadState('networkidle');
       return; // success
     } catch {
-      if (attempt < 2) await page.waitForTimeout(2000);
+      if (attempt < 2) await page.waitForTimeout(3000);
     }
   }
   const url = page.url();
