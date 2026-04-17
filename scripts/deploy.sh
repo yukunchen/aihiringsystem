@@ -34,13 +34,20 @@ if [ -n "$GHCR_TOKEN" ]; then
     echo "$GHCR_TOKEN" | docker login ghcr.io -u yukunchen --password-stdin
 fi
 
-# Validate required secrets from environment
-if [ -z "$OPENAI_API_KEY" ]; then
-    echo "⚠️  OPENAI_API_KEY not set in environment — AI matching will not work"
+# Write runtime secrets to a mode-600 env file so containers survive restarts
+# outside the deploy workflow (auto-restart, OOM, host reboot, manual restart).
+# GitHub secret is the source of truth; this file gets rewritten on every deploy.
+SECRETS_DIR="/opt/ai-hiring/secrets"
+SECRETS_FILE="$SECRETS_DIR/$ENV.env"
+if [ -n "$OPENAI_API_KEY" ]; then
+    sudo mkdir -p "$SECRETS_DIR"
+    sudo chmod 700 "$SECRETS_DIR"
+    echo "OPENAI_API_KEY=$OPENAI_API_KEY" | sudo tee "$SECRETS_FILE" > /dev/null
+    sudo chmod 600 "$SECRETS_FILE"
+    echo "🔑 Secrets written to $SECRETS_FILE (mode 600)"
+elif [ ! -f "$SECRETS_FILE" ]; then
+    echo "⚠️  OPENAI_API_KEY not in env and $SECRETS_FILE missing — AI matching will fail"
 fi
-
-# Export so docker compose substitutes ${OPENAI_API_KEY} in .env
-export OPENAI_API_KEY
 
 # Pull latest images
 echo "📥 Pulling latest images..."

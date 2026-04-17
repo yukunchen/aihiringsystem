@@ -35,12 +35,13 @@ services:
 
   ai-matching:
     image: ${REGISTRY}/${IMAGE_PREFIX}/ai-matching-service:${IMAGE_TAG}
+    env_file:
+      - /opt/ai-hiring/secrets/prod.env
     ports:
       - "${AI_PORT}:8001"
     environment:
       - LLM_MODEL=gpt-4o
       - EMBEDDING_MODEL=text-embedding-3-small
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
       - QDRANT_HOST=${QDRANT_HOST}
       - QDRANT_PORT=${QDRANT_PORT}
     restart: always
