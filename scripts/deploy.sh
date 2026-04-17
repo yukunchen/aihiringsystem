@@ -41,8 +41,10 @@ SECRETS_DIR="/opt/ai-hiring/secrets"
 SECRETS_FILE="$SECRETS_DIR/$ENV.env"
 if [ -n "$OPENAI_API_KEY" ]; then
     sudo mkdir -p "$SECRETS_DIR"
+    sudo chown "$(id -u):$(id -g)" "$SECRETS_DIR"
     sudo chmod 700 "$SECRETS_DIR"
     echo "OPENAI_API_KEY=$OPENAI_API_KEY" | sudo tee "$SECRETS_FILE" > /dev/null
+    sudo chown "$(id -u):$(id -g)" "$SECRETS_FILE"
     sudo chmod 600 "$SECRETS_FILE"
     echo "🔑 Secrets written to $SECRETS_FILE (mode 600)"
 elif [ ! -f "$SECRETS_FILE" ]; then
