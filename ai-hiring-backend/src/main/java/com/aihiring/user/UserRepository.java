@@ -1,5 +1,6 @@
 package com.aihiring.user;
 
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -14,6 +15,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     boolean existsByUsername(String username);
     boolean existsByEmail(String email);
 
-    @Query("SELECT u FROM User u LEFT JOIN FETCH u.roles r LEFT JOIN FETCH r.permissions LEFT JOIN FETCH u.department WHERE u.id = :id")
+    @EntityGraph(attributePaths = {"roles", "roles.permissions", "department"})
+    @Query("SELECT u FROM User u WHERE u.id = :id")
     Optional<User> findByIdWithRolesAndPermissions(UUID id);
 }
