@@ -3,6 +3,10 @@
 Issue #103: staging used AI_MATCHING_URL instead of AI_MATCHING_BASE_URL,
 causing the backend to fall back to localhost and fail to reach the AI
 service inside Docker.
+
+DNS collision fix: each environment must use a unique hostname for the
+ai-matching service (e.g. dev-ai-matching, staging-ai-matching) to avoid
+ambiguous DNS resolution on the shared ai-hiring-network.
 """
 
 import pathlib
@@ -66,4 +70,14 @@ def test_ai_matching_base_url_env_var_name(env_name: str):
     )
     assert "AI_MATCHING_BASE_URL" in env_vars, (
         f"{env_name}/docker-compose.yml is missing AI_MATCHING_BASE_URL"
+    )
+
+    # Verify the URL uses an environment-specific hostname to avoid DNS
+    # collisions on the shared ai-hiring-network.
+    url = env_vars["AI_MATCHING_BASE_URL"]
+    expected_host = f"{env_name}-ai-matching"
+    assert expected_host in url, (
+        f"{env_name}/docker-compose.yml AI_MATCHING_BASE_URL={url} — "
+        f"must use environment-specific hostname '{expected_host}' "
+        f"to avoid DNS collision on the shared Docker network"
     )

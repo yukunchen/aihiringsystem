@@ -95,6 +95,22 @@ class MatchControllerIntegrationTest {
     }
 
     @Test
+    void match_whenAiServiceReturns500_propagates502() throws Exception {
+        wireMock.stubFor(WireMock.post(WireMock.urlEqualTo("/match"))
+            .willReturn(WireMock.aResponse()
+                .withStatus(500)
+                .withHeader("Content-Type", "application/json")
+                .withBody("{\"detail\": \"Internal server error\"}")));
+
+        mockMvc.perform(post("/api/match")
+                .with(adminUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"jobId\": \"%s\", \"topK\": 5}".formatted(UUID.randomUUID())))
+            .andExpect(status().isBadGateway())
+            .andExpect(jsonPath("$.code").value(502));
+    }
+
+    @Test
     void match_withoutPermission_returns403() throws Exception {
         UserDetailsImpl viewer = UserDetailsImpl.create(
             UUID.fromString("04000000-0000-0000-0000-000000000001"),

@@ -21,7 +21,7 @@ services:
       - DB_USERNAME=${POSTGRES_USER}
       - DB_PASSWORD=${POSTGRES_PASSWORD}
       - DB_DRIVER=org.postgresql.Driver
-      - AI_MATCHING_BASE_URL=http://ai-matching:8001
+      - AI_MATCHING_BASE_URL=http://prod-ai-matching:8001
       - JWT_SECRET=${JWT_SECRET}
       - SPRING_PROFILES_ACTIVE=prod
       - SPRING_FLYWAY_ENABLED=true
@@ -35,6 +35,7 @@ services:
 
   ai-matching:
     image: ${REGISTRY}/${IMAGE_PREFIX}/ai-matching-service:${IMAGE_TAG}
+    hostname: prod-ai-matching
     ports:
       - "${AI_PORT}:8001"
     environment:
@@ -45,8 +46,12 @@ services:
       - QDRANT_PORT=${QDRANT_PORT}
     restart: always
     networks:
-      - prod-internal
-      - ai-hiring-network
+      prod-internal:
+        aliases:
+          - prod-ai-matching
+      ai-hiring-network:
+        aliases:
+          - prod-ai-matching
 
 networks:
   prod-internal:
