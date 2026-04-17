@@ -34,15 +34,13 @@ if [ -n "$GHCR_TOKEN" ]; then
     echo "$GHCR_TOKEN" | docker login ghcr.io -u yukunchen --password-stdin
 fi
 
-# Persist runtime secrets to .env so docker compose picks them up
-if [ -n "$OPENAI_API_KEY" ]; then
-    if grep -q "^OPENAI_API_KEY=" .env 2>/dev/null; then
-        sed -i "s|^OPENAI_API_KEY=.*|OPENAI_API_KEY=$OPENAI_API_KEY|" .env
-    else
-        echo "OPENAI_API_KEY=$OPENAI_API_KEY" >> .env
-    fi
-    echo "🔑 OPENAI_API_KEY written to .env"
+# Validate required secrets from environment
+if [ -z "$OPENAI_API_KEY" ]; then
+    echo "⚠️  OPENAI_API_KEY not set in environment — AI matching will not work"
 fi
+
+# Export so docker compose substitutes ${OPENAI_API_KEY} in .env
+export OPENAI_API_KEY
 
 # Pull latest images
 echo "📥 Pulling latest images..."
