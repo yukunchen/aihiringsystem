@@ -34,6 +34,14 @@ if [ -n "$GHCR_TOKEN" ]; then
     echo "$GHCR_TOKEN" | docker login ghcr.io -u yukunchen --password-stdin
 fi
 
+# Validate required secrets from environment
+if [ -z "$OPENAI_API_KEY" ]; then
+    echo "⚠️  OPENAI_API_KEY not set in environment — AI matching will not work"
+fi
+
+# Export so docker compose substitutes ${OPENAI_API_KEY} in .env
+export OPENAI_API_KEY
+
 # Pull latest images
 echo "📥 Pulling latest images..."
 docker compose pull
