@@ -19,7 +19,7 @@ const STATUS_COLORS: Record<string, string> = {
   DRAFT: 'default', PUBLISHED: 'success', PAUSED: 'warning', CLOSED: 'error',
 };
 
-const LLM_COLOR = (score: number) => score >= 80 ? 'green' : score >= 60 ? 'orange' : 'red';
+
 
 export default function JobDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -118,16 +118,27 @@ export default function JobDetailPage() {
 
   const nextStatuses = STATUS_TRANSITIONS[job.status] ?? [];
 
+  const RELEVANCE_LEVEL = (score: number) => {
+    if (score >= 80) return { label: 'Excellent', color: '#52c41a' };
+    if (score >= 60) return { label: 'Good', color: '#1890ff' };
+    if (score >= 40) return { label: 'Fair', color: '#faad14' };
+    return { label: 'Low', color: '#ff4d4f' };
+  };
+
   const matchColumns = [
     { title: '#', key: 'rank', render: (_: unknown, __: unknown, i: number) => i + 1, width: 50 },
     {
-      title: 'Resume ID', dataIndex: 'resumeId', key: 'resumeId',
-      render: (id: string) => <Tooltip title={id}>{id.slice(0, 8)}…</Tooltip>,
+      title: 'Candidate', dataIndex: 'candidateName', key: 'candidateName',
+      render: (name: string, record: MatchResultItem) => (
+        <Tooltip title={`Resume ID: ${record.resumeId}`}>{name}</Tooltip>
+      ),
     },
-    { title: 'Vector Score', dataIndex: 'vectorScore', key: 'vectorScore', render: (v: number) => v.toFixed(2) },
     {
-      title: 'LLM Score', dataIndex: 'llmScore', key: 'llmScore',
-      render: (v: number) => <span style={{ color: LLM_COLOR(v), fontWeight: 600 }}>{v}</span>,
+      title: 'Relevance', dataIndex: 'llmScore', key: 'relevance',
+      render: (v: number) => {
+        const level = RELEVANCE_LEVEL(v);
+        return <Tag color={level.color}>{level.label}</Tag>;
+      },
     },
     {
       title: 'Reasoning', dataIndex: 'reasoning', key: 'reasoning',

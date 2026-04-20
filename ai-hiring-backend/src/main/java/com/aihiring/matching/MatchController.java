@@ -3,6 +3,8 @@ package com.aihiring.matching;
 import com.aihiring.common.dto.ApiResponse;
 import com.aihiring.common.exception.BusinessException;
 import com.aihiring.matching.dto.*;
+import com.aihiring.resume.Resume;
+import com.aihiring.resume.ResumeRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -10,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.ResourceAccessException;
 
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
@@ -19,6 +21,7 @@ import java.util.stream.Collectors;
 public class MatchController {
 
     private final MatchService matchService;
+    private final ResumeRepository resumeRepository;
 
     @PostMapping
     @PreAuthorize("hasAuthority('job:read')")
@@ -32,9 +35,29 @@ public class MatchController {
             throw new BusinessException(503, "AI matching service unavailable");
         }
 
+        // Look up candidate names for all matched resumes
+        Map<String, String> nameMap = new HashMap<>();
+        List<UUID> resumeIds = new ArrayList<>();
+        for (var item : aiResponse.getResults()) {
+            try {
+                resumeIds.add(UUID.fromString(item.getResumeId()));
+            } catch (IllegalArgumentException ignored) { }
+        }
+        if (!resumeIds.isEmpty()) {
+            resumeRepository.findAllById(resumeIds).forEach(resume -> {
+                String name = resume.getCandidateName();
+                if (name == null || name.isBlank()) {
+                    name = resume.getFileName().replaceFirst("\\.[^.]+$", "");
+                }
+                nameMap.put(resume.getId().toString(), name);
+            });
+        }
+
         var results = aiResponse.getResults().stream()
             .map(item -> new MatchResultItem(
-                item.getResumeId(), item.getVectorScore(), item.getLlmScore(),
+                item.getResumeId(),
+                nameMap.getOrDefault(item.getResumeId(), item.getResumeId().length() > 8 ? item.getResumeId().substring(0, 8) : item.getResumeId()),
+                item.getVectorScore(), item.getLlmScore(),
                 item.getReasoning(), item.getHighlights()
             ))
             .collect(Collectors.toList());
