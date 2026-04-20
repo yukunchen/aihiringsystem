@@ -76,7 +76,8 @@ class MatchControllerIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200))
             .andExpect(jsonPath("$.data.results[0].llmScore").value(87))
-            .andExpect(jsonPath("$.data.results[0].resumeId").value("resume-001"));
+            .andExpect(jsonPath("$.data.results[0].resumeId").value("resume-001"))
+            .andExpect(jsonPath("$.data.results[0].candidateName").value("resume-0"));
     }
 
     @Test

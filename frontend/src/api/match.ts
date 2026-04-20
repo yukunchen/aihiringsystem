@@ -2,6 +2,7 @@ import { request } from './request';
 
 export interface MatchResultItem {
   resumeId: string;
+  candidateName: string;
   vectorScore: number;
   llmScore: number;
   reasoning: string;

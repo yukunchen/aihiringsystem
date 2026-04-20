@@ -8,6 +8,7 @@ import java.util.List;
 @AllArgsConstructor
 public class MatchResultItem {
     private String resumeId;
+    private String candidateName;
     private double vectorScore;
     private int llmScore;
     private String reasoning;
