@@ -96,3 +96,54 @@ def test_match_result_includes_vector_score(client):
 def test_match_top_k_max_50(client):
     response = client.post("/match", json={"job_id": "job-999", "top_k": 51})
     assert response.status_code == 422
+
+
+def test_match_dedupes_resumes_with_identical_content(client):
+    """Issue #115: same resume content (e.g. re-uploaded file producing distinct
+    resume IDs) must collapse to a single result, keeping the highest LLM score."""
+    job_record = _make_job_record("job-dup")
+    candidates = [
+        _make_scored_point("resume-a", 0.90, "Alice — Java, 5y"),
+        _make_scored_point("resume-b", 0.88, "Alice — Java, 5y"),  # duplicate content
+        _make_scored_point("resume-c", 0.70, "Bob — Python"),
+    ]
+    scores = [
+        MatchScore(score=70, reasoning="ok", highlights=[]),
+        MatchScore(score=85, reasoning="great", highlights=["Java"]),
+        MatchScore(score=60, reasoning="partial", highlights=[]),
+    ]
+
+    with patch("services.vector_store.get_job_record", new=AsyncMock(return_value=job_record)), \
+         patch("services.vector_store.search_resumes", new=AsyncMock(return_value=candidates)), \
+         patch("services.llm.score_match", new=AsyncMock(side_effect=scores)):
+        response = client.post("/match", json={"job_id": "job-dup", "top_k": 5})
+
+    data = response.json()
+    assert len(data["results"]) == 2
+    resume_ids = [r["resume_id"] for r in data["results"]]
+    assert "resume-b" in resume_ids  # higher-scored duplicate kept
+    assert "resume-a" not in resume_ids
+    assert "resume-c" in resume_ids
+
+
+def test_match_dedupes_repeated_resume_id(client):
+    """Defensive: if vector search returns the same resume_id twice, only one survives."""
+    job_record = _make_job_record("job-rep")
+    candidates = [
+        _make_scored_point("resume-x", 0.91, "X content"),
+        _make_scored_point("resume-x", 0.80, "X content"),
+    ]
+    scores = [
+        MatchScore(score=75, reasoning="a", highlights=[]),
+        MatchScore(score=82, reasoning="b", highlights=[]),
+    ]
+
+    with patch("services.vector_store.get_job_record", new=AsyncMock(return_value=job_record)), \
+         patch("services.vector_store.search_resumes", new=AsyncMock(return_value=candidates)), \
+         patch("services.llm.score_match", new=AsyncMock(side_effect=scores)):
+        response = client.post("/match", json={"job_id": "job-rep", "top_k": 5})
+
+    data = response.json()
+    assert len(data["results"]) == 1
+    assert data["results"][0]["resume_id"] == "resume-x"
+    assert data["results"][0]["llm_score"] == 82

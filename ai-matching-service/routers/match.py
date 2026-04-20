@@ -34,6 +34,29 @@ async def match_resumes(request: MatchRequest):
             highlights=score.highlights,
         )
 
-    results = await asyncio.gather(*[score_candidate(c) for c in candidates])
-    ranked = sorted(results, key=lambda r: r.llm_score, reverse=True)
-    return MatchResponse(job_id=request.job_id, results=ranked[: request.top_k])
+    scored = await asyncio.gather(*[score_candidate(c) for c in candidates])
+    ranked = sorted(
+        zip(scored, candidates), key=lambda pair: pair[0].llm_score, reverse=True
+    )
+
+    # Issue #115: collapse duplicates so each unique resume — both by id and by
+    # raw content (re-uploaded files produce distinct ids for identical text) —
+    # appears at most once. Highest LLM score wins because list is pre-sorted.
+    deduped: list[MatchResultItem] = []
+    seen_ids: set[str] = set()
+    seen_text_hashes: set[str] = set()
+    for item, candidate in ranked:
+        if item.resume_id in seen_ids:
+            continue
+        raw_text = (candidate.payload.get("raw_text") or "").strip()
+        text_key = raw_text if raw_text else None
+        if text_key and text_key in seen_text_hashes:
+            continue
+        seen_ids.add(item.resume_id)
+        if text_key:
+            seen_text_hashes.add(text_key)
+        deduped.append(item)
+        if len(deduped) >= request.top_k:
+            break
+
+    return MatchResponse(job_id=request.job_id, results=deduped)
