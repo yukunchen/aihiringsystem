@@ -120,6 +120,77 @@ test.describe.serial('Core flows', () => {
   });
 });
 
+test.describe.serial('AI Matching', () => {
+  test('trigger AI matching on a JD and get results', async ({ page }) => {
+    await login(page);
+
+    // Step 1: Navigate to jobs list and click into the first JD (created by earlier tests or existing)
+    await page.goto('/jobs', { waitUntil: 'networkidle' });
+
+    // If no jobs exist, create one first
+    const hasJobs = await page.locator('.ant-table-row').count() > 0;
+    let jobUrl: string;
+
+    if (hasJobs) {
+      // Click the "View" button on the first job row
+      await page.locator('.ant-table-row').first().getByText('View').click();
+      await page.waitForURL(/.*\/jobs\/[a-f0-9-]+/, { timeout: 10000 });
+      jobUrl = page.url();
+    } else {
+      // Create a JD first
+      await page.getByRole('button', { name: /create/i }).click();
+      await page.waitForURL(/.*\/jobs\/(create|new)/);
+      await page.waitForLoadState('networkidle');
+      const title = `E2E-Match-${Date.now()}`;
+      await page.getByPlaceholder('Title').fill(title);
+      await page.locator('.ant-select').click();
+      await page.locator('.ant-select-item').first().click();
+      await page.getByPlaceholder('Description').fill('Senior backend engineer with Java and Spring Boot experience, 3+ years');
+      await page.getByRole('button', { name: /submit/i }).click();
+      await expect(page.getByText(title)).toBeVisible({ timeout: 15000 });
+      jobUrl = page.url();
+    }
+
+    // Step 2: On the JD detail page, find the "Find Matching Resumes" button
+    await expect(page.getByText('AI Matching')).toBeVisible({ timeout: 10000 });
+    const matchBtn = page.getByRole('button', { name: /find matching/i });
+    await expect(matchBtn).toBeVisible();
+
+    // Step 3: Click the match button
+    await matchBtn.click();
+
+    // Step 4: Wait for results - could be:
+    // - A table with matching resumes
+    // - "No matching resumes found" alert
+    // - 422 warning (JD not indexed yet - retry after wait)
+    // - 503 error (AI service unavailable)
+    // Allow up to 60s for AI processing
+    const resultLocator = page.locator('.ant-table-row, .ant-alert');
+    await expect(resultLocator.first()).toBeVisible({ timeout: 60000 });
+
+    // If we got a 422 "not indexed" warning, wait and retry once
+    const has422 = await page.getByText('not been indexed yet').isVisible().catch(() => false);
+    if (has422) {
+      await page.waitForTimeout(5000);
+      await matchBtn.click();
+      await expect(resultLocator.first()).toBeVisible({ timeout: 60000 });
+    }
+
+    // Take screenshot for evidence
+    await page.screenshot({ path: 'test-results/ai-matching-result.png', fullPage: true });
+
+    // Verify we got either matching results or a valid "no matches" message (not an error)
+    const hasResults = await page.locator('.ant-table-row').count() > 0;
+    const hasNoMatch = await page.getByText('No matching resumes found').isVisible().catch(() => false);
+    const has503 = await page.getByText('service is currently unavailable').isVisible().catch(() => false);
+
+    // AI matching should work - either find matches or legitimately find none
+    // 503 means the AI service is down, which is a real failure
+    expect(has503).toBe(false);
+    expect(hasResults || hasNoMatch).toBe(true);
+  });
+});
+
 test.describe('Page rendering', () => {
   test('login page displays correctly', async ({ browser }) => {
     const context = await browser.newContext();
