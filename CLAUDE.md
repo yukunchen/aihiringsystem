@@ -58,9 +58,18 @@ JWT-based: access token (2h TTL) + refresh token (7d TTL).
 
 ## Git Workflow
 
+- **所有进入 master 的改动都必须经过用户 review。** 这是不可违反的基本规则。无论改动多小、多紧急，一律创建 PR 等用户 merge，没有例外。
 - 永远不要直接 push 到 master。必须创建 feature branch 并开 PR。
 - 永远不要自行 merge PR。等用户 review 后由用户 merge。
-- commit 只包含当前任务相关的文件，不要捆绑无关改动。
+- **永远不要用 `git add -A` 或 `git add .`。** 必须逐个指定要提交的文件（`git add file1 file2`），避免把 uploads、__pycache__、临时文件等无关内容提交进去。
+- commit 只包含当前任务相关的文件，不要捆绑无关改动。提交前用 `git diff --cached --stat` 确认文件列表。
+- 已 merge 的 PR 分支不能再 push 新 commit（不会进入 master）。如果有后续修改，必须开新分支、新 PR。
+
+## Evidence & Screenshot Rules
+
+- 在 GitHub issue/PR 中附截图时，**必须使用 GitHub 能渲染的 URL**。不能用本地路径（如 `test-results/xxx.png`），GitHub 上看不到。
+- 正确做法：将截图 commit 到仓库（如 `docs/evidence/`）并用 `https://raw.githubusercontent.com/...` 链接，或通过 GitHub issue 上传获取 URL。
+- 关闭 issue 前必须确认截图在 GitHub 页面上能正确显示。
 
 ## Execution Principles
 
