@@ -1,0 +1,39 @@
+name: Notify Autofix Issue
+
+on:
+  issues:
+    types: [opened, labeled]
+
+jobs:
+  notify:
+    if: contains(github.event.issue.labels.*.name, 'autofix')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write to VPS notification queue
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: ISSUE_NUMBER,ISSUE_TITLE,ISSUE_LABELS,ISSUE_URL,ISSUE_BODY
+          script: |
+            python3 << 'PYEOF'
+            import json, datetime, os
+            entry = {
+              'id': f'issue-{os.environ["ISSUE_NUMBER"]}',
+              'timestamp': datetime.datetime.utcnow().isoformat() + 'Z',
+              'read': False,
+              'type': 'new_issue',
+              'message': f'🔧 Autofix issue #{os.environ["ISSUE_NUMBER"]}: {os.environ["ISSUE_TITLE"]}',
+              'details': f'Labels: {os.environ.get("ISSUE_LABELS","")}\nURL: {os.environ["ISSUE_URL"]}\n\n{os.environ.get("ISSUE_BODY","")[:500]}',
+              'run_url': os.environ["ISSUE_URL"]
+            }
+            with open('/opt/ai-hiring/notifications/queue.jsonl', 'a') as f:
+                f.write(json.dumps(entry) + '\n')
+            PYEOF
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_LABELS: ${{ join(github.event.issue.labels.*.name, ', ') }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
