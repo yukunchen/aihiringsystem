@@ -12,9 +12,21 @@ async def match_resumes(request: MatchRequest):
     if job_record is None:
         raise HTTPException(status_code=404, detail="Job not found in vector store")
 
-    candidates = await vector_store.search_resumes(job_record.vector, request.top_k * 2)
-    if not candidates:
+    raw_candidates = await vector_store.search_resumes(job_record.vector, request.top_k * 5)
+    if not raw_candidates:
         return MatchResponse(job_id=request.job_id, results=[])
+
+    # Deduplicate by raw_text content — keep highest vector score per unique resume
+    seen_texts: dict[str, object] = {}
+    candidates = []
+    for c in raw_candidates:
+        text = c.payload.get("raw_text", "")
+        text_key = text[:200]  # Use first 200 chars as dedup key
+        if text_key not in seen_texts:
+            seen_texts[text_key] = True
+            candidates.append(c)
+        if len(candidates) >= request.top_k * 2:
+            break
 
     payload = job_record.payload
     job_text = f"Title: {payload['title']}\n\nDescription:\n{payload['description']}"

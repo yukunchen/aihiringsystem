@@ -73,8 +73,8 @@ def test_match_overfetches_from_qdrant(client):
          patch("services.vector_store.search_resumes", new=search_mock):
         client.post("/match", json={"job_id": "job-003", "top_k": 5})
 
-    # Should search for top_k * 2 = 10 candidates
-    search_mock.assert_called_once_with(job_record.vector, 10)
+    # Should search for top_k * 5 = 25 candidates (overfetch for dedup)
+    search_mock.assert_called_once_with(job_record.vector, 25)
 
 
 def test_match_result_includes_vector_score(client):
@@ -91,6 +91,34 @@ def test_match_result_includes_vector_score(client):
     assert result["resume_id"] == "resume-x"
     assert result["vector_score"] == 0.93
     assert result["llm_score"] == 88
+
+
+def test_match_deduplicates_same_resume(client):
+    job_record = _make_job_record("job-005")
+    # 3 candidates but two have identical raw_text (duplicate uploads)
+    candidates = [
+        _make_scored_point("resume-1", 0.90, "Alice is a Java engineer with 5 years experience"),
+        _make_scored_point("resume-2", 0.88, "Alice is a Java engineer with 5 years experience"),  # duplicate
+        _make_scored_point("resume-3", 0.85, "Bob is a Python developer"),
+    ]
+    scores = [
+        MatchScore(score=80, reasoning="Good", highlights=["Java"]),
+        MatchScore(score=70, reasoning="OK", highlights=["Python"]),
+    ]
+
+    with patch("services.vector_store.get_job_record", new=AsyncMock(return_value=job_record)), \
+         patch("services.vector_store.search_resumes", new=AsyncMock(return_value=candidates)), \
+         patch("services.llm.score_match", new=AsyncMock(side_effect=scores)):
+        response = client.post("/match", json={"job_id": "job-005", "top_k": 10})
+
+    assert response.status_code == 200
+    results = response.json()["results"]
+    # Should only have 2 unique resumes, not 3
+    assert len(results) == 2
+    resume_ids = [r["resume_id"] for r in results]
+    assert "resume-1" in resume_ids  # kept (higher vector score)
+    assert "resume-2" not in resume_ids  # deduped
+    assert "resume-3" in resume_ids
 
 
 def test_match_top_k_max_50(client):
