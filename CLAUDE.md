@@ -65,6 +65,12 @@ JWT-based: access token (2h TTL) + refresh token (7d TTL).
 - commit 只包含当前任务相关的文件，不要捆绑无关改动。提交前用 `git diff --cached --stat` 确认文件列表。
 - 已 merge 的 PR 分支不能再 push 新 commit（不会进入 master）。如果有后续修改，必须开新分支、新 PR。
 
+## Issue Closing Rules
+
+- **永远不要在 commit message 或 PR body 中使用 `Closes #N`、`Fixes #N`、`Resolves #N`。** 这些关键词会在 merge 时自动关闭 issue，绕过用户的人工验证环节。
+- 只使用 `(issue #N)` 或 `Related to #N` 来引用 issue。
+- Issue 只能由用户在验证通过后手动关闭。
+
 ## Evidence & Screenshot Rules
 
 - 在 GitHub issue/PR 中附截图时，**必须使用 GitHub 能渲染的 URL**。不能用本地路径（如 `test-results/xxx.png`），GitHub 上看不到。

@@ -35,6 +35,12 @@ class MatchControllerIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private com.aihiring.resume.ResumeRepository resumeRepository;
+
+    @Autowired
+    private com.aihiring.user.UserRepository userRepository;
+
     private org.springframework.test.web.servlet.request.RequestPostProcessor adminUser() {
         UserDetailsImpl user = UserDetailsImpl.create(
             UUID.fromString("04000000-0000-0000-0000-000000000001"),
@@ -47,13 +53,25 @@ class MatchControllerIntegrationTest {
 
     @Test
     void match_withValidJob_returnsResults() throws Exception {
+        // Create a real resume in the database so it passes the existence filter
+        var admin = userRepository.findByUsername("admin").orElseThrow();
+        var resume = new com.aihiring.resume.Resume();
+        resume.setFileName("test-candidate.pdf");
+        resume.setCandidateName("Test Candidate");
+        resume.setFilePath("/tmp/test.pdf");
+        resume.setFileSize(1000L);
+        resume.setFileType("PDF");
+        resume.setUploadedBy(admin);
+        resume = resumeRepository.save(resume);
+        UUID resumeId = resume.getId();
+
         UUID jobId = UUID.randomUUID();
         String aiResponseBody = """
             {
               "job_id": "%s",
               "results": [
                 {
-                  "resume_id": "resume-001",
+                  "resume_id": "%s",
                   "vector_score": 0.92,
                   "llm_score": 87,
                   "reasoning": "Strong match",
@@ -61,7 +79,7 @@ class MatchControllerIntegrationTest {
                 }
               ]
             }
-            """.formatted(jobId);
+            """.formatted(jobId, resumeId);
 
         wireMock.stubFor(WireMock.post(WireMock.urlEqualTo("/match"))
             .willReturn(WireMock.aResponse()
@@ -76,8 +94,8 @@ class MatchControllerIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200))
             .andExpect(jsonPath("$.data.results[0].llmScore").value(87))
-            .andExpect(jsonPath("$.data.results[0].resumeId").value("resume-001"))
-            .andExpect(jsonPath("$.data.results[0].candidateName").value("resume-0"));
+            .andExpect(jsonPath("$.data.results[0].resumeId").value(resumeId.toString()))
+            .andExpect(jsonPath("$.data.results[0].candidateName").value("Test Candidate"));
     }
 
     @Test

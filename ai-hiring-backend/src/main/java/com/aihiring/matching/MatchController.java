@@ -53,10 +53,12 @@ public class MatchController {
             });
         }
 
+        // Only include resumes that exist in the database (filter out stale vector store entries)
         var results = aiResponse.getResults().stream()
+            .filter(item -> nameMap.containsKey(item.getResumeId()))
             .map(item -> new MatchResultItem(
                 item.getResumeId(),
-                nameMap.getOrDefault(item.getResumeId(), item.getResumeId().length() > 8 ? item.getResumeId().substring(0, 8) : item.getResumeId()),
+                nameMap.get(item.getResumeId()),
                 item.getVectorScore(), item.getLlmScore(),
                 item.getReasoning(), item.getHighlights()
             ))
