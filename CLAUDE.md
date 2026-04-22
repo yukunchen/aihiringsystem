@@ -58,17 +58,25 @@ JWT-based: access token (2h TTL) + refresh token (7d TTL).
 
 ## Autofix Workflow (issue-driven autonomous fixes)
 
-Before starting work on an `autofix`-labeled issue picked up from the VPS notification queue, **always claim it first**:
+**Session roles.** Two kinds of Claude sessions share this system:
+- **Fixer** — long-running background session on the VPS. Consumes `new_issue` notifications, claims, writes fixes, opens PRs. Should run with `CLAUDE_ROLE=fixer`.
+- **Orchestrator** — interactive session talking to the human. Consumes `pr_ready` pings (so the human is told a PR is waiting) and deploy notifications. Should run with `CLAUDE_ROLE=orchestrator`.
+
+The notification hook (`scripts/check-notifications.sh`, canonical source in this repo; deployed to `/opt/ai-hiring/scripts/`) filters queue entries by role so the fixer does not swallow pings meant for the human, and vice versa. Notifications flow:
+- `/opt/ai-hiring/notifications/queue.jsonl` — `new_issue`, deploy events (fixer + fallback).
+- `/opt/ai-hiring/notifications/orchestrator-queue.jsonl` — `pr_ready` and future orchestrator-only events.
+
+**Claim before work (fixer).** Before starting on an `autofix`-labeled issue:
 
 ```bash
 scripts/autofix-claim.sh <issue-number>
 ```
 
-The script checks that the issue is still OPEN, has no `autofix-in-progress` label, and has no open PR that would close it; then it adds the `autofix-in-progress` label as an advisory lock. If it exits non-zero, skip the issue — another session is already on it or it has been resolved. This prevents the duplicate-fix race that produced PRs #126 and #127 for issue #125.
-
-Reason: `notify-new-issue.yml` can fire multiple times for the same issue, and there is no coordination between VPS sessions. The label acts as a cheap cross-session mutex visible on GitHub.
+The script checks that the issue is still OPEN, has no `autofix-in-progress` label, and has no open PR that would close it; then it adds the `autofix-in-progress` label as an advisory lock. If it exits non-zero, skip the issue — another session is already on it or it has been resolved.
 
 The label is removed automatically when the fixing PR is merged (because the issue closes). If a session abandons the work without a PR, run `scripts/autofix-release.sh <issue-number>` to free the lock.
+
+**PR-ready pings (orchestrator).** `.github/workflows/notify-pr-ready.yml` writes a `pr_ready` entry to the orchestrator queue whenever a non-draft PR is opened, so the orchestrator surfaces pending reviews to the human on the next prompt. Do not merge on the human's behalf — per the Git Workflow rule below, every merge is a human decision.
 
 ## Git Workflow
 

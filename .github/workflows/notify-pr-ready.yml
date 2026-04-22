@@ -1,0 +1,73 @@
+name: Notify PR Ready
+
+# Fires when a PR is opened (or re-opened) so the orchestrator Claude
+# session knows a fix is waiting for human review. Without this, the
+# autofix loop stalls invisibly between "fixer opens PR" and "user
+# merges" — the fixer agent moves on and nothing pings the human.
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Write orchestrator notification to VPS
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: PR_NUMBER,PR_TITLE,PR_URL,PR_BODY,PR_AUTHOR,PR_BRANCH
+          script: |
+            python3 << 'PYEOF'
+            import json, datetime, os
+            queue_path = '/opt/ai-hiring/notifications/orchestrator-queue.jsonl'
+            entry_id = f'pr-{os.environ["PR_NUMBER"]}'
+
+            # Dedup: open → ready_for_review can fire for the same PR.
+            try:
+                with open(queue_path) as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            if json.loads(line).get('id') == entry_id:
+                                print(f'Skip duplicate notification for {entry_id}')
+                                raise SystemExit(0)
+                        except json.JSONDecodeError:
+                            continue
+            except FileNotFoundError:
+                pass
+
+            body_preview = (os.environ.get('PR_BODY') or '')[:400]
+            entry = {
+              'id': entry_id,
+              'timestamp': datetime.datetime.utcnow().isoformat() + 'Z',
+              'read': False,
+              'type': 'pr_ready',
+              'target': 'orchestrator',
+              'message': f'📬 PR #{os.environ["PR_NUMBER"]} ready for review: {os.environ["PR_TITLE"]}',
+              'details': (
+                f'Author: {os.environ.get("PR_AUTHOR","")}\n'
+                f'Branch: {os.environ.get("PR_BRANCH","")}\n'
+                f'URL: {os.environ["PR_URL"]}\n\n'
+                f'{body_preview}'
+              ),
+              'run_url': os.environ['PR_URL']
+            }
+            os.makedirs(os.path.dirname(queue_path), exist_ok=True)
+            with open(queue_path, 'a') as f:
+                f.write(json.dumps(entry) + '\n')
+            print(f'Wrote {entry_id} to orchestrator queue')
+            PYEOF
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
