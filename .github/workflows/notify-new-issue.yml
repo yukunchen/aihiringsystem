@@ -19,8 +19,29 @@ jobs:
           script: |
             python3 << 'PYEOF'
             import json, datetime, os
+            queue_path = '/opt/ai-hiring/notifications/queue.jsonl'
+            entry_id = f'issue-{os.environ["ISSUE_NUMBER"]}'
+
+            # Dedup: GitHub fires both `opened` and one `labeled` event per label
+            # added by issue-triage.yml, so this workflow runs multiple times per
+            # issue. Skip if the queue already contains an entry with this id.
+            try:
+                with open(queue_path) as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            if json.loads(line).get('id') == entry_id:
+                                print(f'Skip duplicate notification for {entry_id}')
+                                raise SystemExit(0)
+                        except json.JSONDecodeError:
+                            continue
+            except FileNotFoundError:
+                pass
+
             entry = {
-              'id': f'issue-{os.environ["ISSUE_NUMBER"]}',
+              'id': entry_id,
               'timestamp': datetime.datetime.utcnow().isoformat() + 'Z',
               'read': False,
               'type': 'new_issue',
@@ -28,7 +49,7 @@ jobs:
               'details': f'Labels: {os.environ.get("ISSUE_LABELS","")}\nURL: {os.environ["ISSUE_URL"]}\n\n{os.environ.get("ISSUE_BODY","")[:500]}',
               'run_url': os.environ["ISSUE_URL"]
             }
-            with open('/opt/ai-hiring/notifications/queue.jsonl', 'a') as f:
+            with open(queue_path, 'a') as f:
                 f.write(json.dumps(entry) + '\n')
             PYEOF
         env:
