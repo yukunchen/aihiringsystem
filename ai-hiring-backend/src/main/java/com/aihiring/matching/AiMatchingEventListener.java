@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Component
@@ -20,6 +21,7 @@ public class AiMatchingEventListener {
 
     @Async
     @EventListener
+    @Transactional
     public void onResumeUploaded(ResumeUploadedEvent event) {
         if (event.getRawText() == null) {
             log.debug("Skipping vectorization for resume {} — no raw text", event.getResumeId());
@@ -27,18 +29,28 @@ public class AiMatchingEventListener {
         }
 
         log.info("Vectorizing resume {}", event.getResumeId());
-        boolean success = client.vectorizeResume(event.getResumeId(), event.getRawText());
+        boolean success;
+        try {
+            success = client.vectorizeResume(event.getResumeId(), event.getRawText());
+        } catch (Throwable t) {
+            log.error("Unexpected error vectorizing resume {}", event.getResumeId(), t);
+            success = false;
+        }
 
-        resumeRepository.findById(event.getResumeId()).ifPresent(resume -> {
-            if (success) {
-                resume.setStatus(ResumeStatus.AI_PROCESSED);
-                log.info("Resume {} vectorized successfully, status → AI_PROCESSED", event.getResumeId());
-            } else {
-                resume.setStatus(ResumeStatus.VECTORIZATION_FAILED);
-                log.warn("Resume {} vectorization failed, status → VECTORIZATION_FAILED", event.getResumeId());
-            }
-            resumeRepository.save(resume);
-        });
+        ResumeStatus target = success ? ResumeStatus.AI_PROCESSED : ResumeStatus.VECTORIZATION_FAILED;
+        markStatus(event.getResumeId(), target);
+    }
+
+    private void markStatus(java.util.UUID resumeId, ResumeStatus target) {
+        try {
+            resumeRepository.findById(resumeId).ifPresent(resume -> {
+                resume.setStatus(target);
+                resumeRepository.save(resume);
+                log.info("Resume {} status → {}", resumeId, target);
+            });
+        } catch (Throwable t) {
+            log.error("Failed to update resume {} status to {}", resumeId, target, t);
+        }
     }
 
     @Async
