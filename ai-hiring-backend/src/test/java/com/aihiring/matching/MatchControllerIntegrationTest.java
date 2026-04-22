@@ -81,6 +81,40 @@ class MatchControllerIntegrationTest {
     }
 
     @Test
+    void match_filtersOutStaleResumeIdsNotInDatabase() throws Exception {
+        UUID jobId = UUID.randomUUID();
+        UUID staleResumeId = UUID.randomUUID();
+        String aiResponseBody = """
+            {
+              "job_id": "%s",
+              "results": [
+                {
+                  "resume_id": "%s",
+                  "vector_score": 0.92,
+                  "llm_score": 87,
+                  "reasoning": "Stale match from vector store",
+                  "highlights": ["Java"]
+                }
+              ]
+            }
+            """.formatted(jobId, staleResumeId);
+
+        wireMock.stubFor(WireMock.post(WireMock.urlEqualTo("/match"))
+            .willReturn(WireMock.aResponse()
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody(aiResponseBody)));
+
+        mockMvc.perform(post("/api/match")
+                .with(adminUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"jobId\": \"%s\", \"topK\": 10}".formatted(jobId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.results.length()").value(0));
+    }
+
+    @Test
     void match_whenAiServiceReturns404_propagates422() throws Exception {
         wireMock.stubFor(WireMock.post(WireMock.urlEqualTo("/match"))
             .willReturn(WireMock.aResponse()
