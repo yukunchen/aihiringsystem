@@ -181,20 +181,51 @@ jobs:
           echo "" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
+      - name: Resolve linked issues
+        id: linked
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          # Primary: use GitHub's native PR→issue linkage (captures "Fixes #N"
+          # from the PR body, which GitHub squash-merges strip out). The merge
+          # commit contains "(#<PR>)" from the PR number.
+          PR_NUM=$(echo "$COMMIT_MSG" | head -1 | grep -oE '\(#[0-9]+\)' | tail -1 | tr -d '(#)' || true)
+          ISSUES=""
+          if [ -n "$PR_NUM" ]; then
+            ISSUES=$(gh pr view "$PR_NUM" --repo "${{ github.repository }}" \
+              --json closingIssuesReferences \
+              --jq '.closingIssuesReferences[].number' 2>/dev/null || true)
+          fi
+
+          # Fallback: broaden regex to catch "issue #N", "fix #N", "(#N)", bare
+          # "#N" in the subject — covers PR titles that forgot "Fixes #N".
+          if [ -z "$ISSUES" ]; then
+            ISSUES=$(echo "$COMMIT_MSG" \
+              | grep -oiE '(closes?|fixes?|resolves?|issues?) ?#[0-9]+|\(#[0-9]+\)|#[0-9]+' \
+              | grep -oE '#[0-9]+' | tr -d '#' \
+              | sort -u || true)
+            # Exclude the PR number itself from the fallback results
+            if [ -n "$PR_NUM" ]; then
+              ISSUES=$(echo "$ISSUES" | grep -v "^${PR_NUM}$" || true)
+            fi
+          fi
+
+          ISSUES=$(echo "$ISSUES" | tr '\n' ' ' | xargs)
+          echo "issues=$ISSUES" >> "$GITHUB_OUTPUT"
+          echo "Linked issues: ${ISSUES:-<none>}"
+
       - name: Comment on linked issues
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PASS: ${{ steps.smoke.outputs.pass }}
           DETAILS: ${{ steps.smoke.outputs.details }}
-          COMMIT_MSG: ${{ github.event.head_commit.message }}
+          ISSUES: ${{ steps.linked.outputs.issues }}
           SHA: ${{ github.sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          # Extract issue numbers from commit message (e.g. "closes #21", "fixes #19")
-          ISSUES=$(echo "$COMMIT_MSG" | grep -oiE '(closes?|fixes?|resolves?) #[0-9]+' | grep -oE '#[0-9]+' | tr -d '#' || true)
-
           if [ -z "$ISSUES" ]; then
-            echo "No linked issues found in commit message, skipping comment"
+            echo "No linked issues resolved, skipping comment"
             exit 0
           fi
 
@@ -248,22 +279,15 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Trigger Verifier Agent on VPS
-        if: steps.smoke.outputs.pass == 'true'
+        if: steps.smoke.outputs.pass == 'true' && steps.linked.outputs.issues != ''
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          envs: COMMIT_MSG
+          envs: ISSUES
           command_timeout: 2m
           script: |
-            ISSUES=$(echo "$COMMIT_MSG" \
-              | grep -oiE '(closes?|fixes?|resolves?) #[0-9]+' \
-              | grep -oE '#[0-9]+' | tr -d '#' || true)
-            if [ -z "$ISSUES" ]; then
-              echo "No linked issues in commit message — skipping verifier"
-              exit 0
-            fi
             for ISSUE in $ISSUES; do
               ISSUE_BODY=$(gh issue view "$ISSUE" --repo "${{ github.repository }}" --json body -q '.body' 2>/dev/null || echo "")
               LOG="/opt/ai-hiring/logs/verify-issue-${ISSUE}.log"
@@ -273,7 +297,7 @@ jobs:
               echo "Launched verifier for issue #$ISSUE (PID $!) — log: $LOG"
             done
         env:
-          COMMIT_MSG: ${{ github.event.head_commit.message }}
+          ISSUES: ${{ steps.linked.outputs.issues }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   e2e:
