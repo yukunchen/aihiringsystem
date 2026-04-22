@@ -14,13 +14,38 @@ env:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    outputs:
+      resolved_version: ${{ steps.resolve.outputs.sha }}
     steps:
-      - name: Verify images exist
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Resolve version to full SHA
+        id: resolve
         run: |
-          echo "Verifying images for version ${{ inputs.version }}"
-          echo "Backend: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/ai-hiring-backend:${{ inputs.version }}"
-          echo "AI Service: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/ai-matching-service:${{ inputs.version }}"
-          echo "Frontend: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/ai-hiring-frontend:${{ inputs.version }}"
+          INPUT="${{ inputs.version }}"
+          if ! SHA=$(git rev-parse --verify "${INPUT}^{commit}" 2>/dev/null); then
+            echo "::error::Cannot resolve '${INPUT}' to a commit SHA"
+            exit 1
+          fi
+          echo "Resolved '${INPUT}' -> ${SHA}"
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GHCR_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+      - name: Verify images exist in registry
+        env:
+          SHA: ${{ steps.resolve.outputs.sha }}
+        run: |
+          set -e
+          for IMG in ai-hiring-backend ai-matching-service ai-hiring-frontend; do
+            REF="${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${IMG}:${SHA}"
+            echo "Checking ${REF}..."
+            if ! docker manifest inspect "${REF}" > /dev/null 2>&1; then
+              echo "::error::Image not found in registry: ${REF}"
+              exit 1
+            fi
+          done
+          echo "All images verified."
 
   deploy:
     needs: verify
@@ -69,7 +94,7 @@ jobs:
             cp /tmp/ai-hiring-scripts/scripts/rollback.sh /opt/ai-hiring/scripts/rollback.sh
             chmod +x /opt/ai-hiring/scripts/deploy.sh /opt/ai-hiring/scripts/health-check.sh /opt/ai-hiring/scripts/rollback.sh
             export OPENAI_API_KEY="$OPENAI_API_KEY"
-            /opt/ai-hiring/scripts/deploy.sh prod ${{ inputs.version }} "$GHCR_TOKEN"
+            /opt/ai-hiring/scripts/deploy.sh prod ${{ needs.verify.outputs.resolved_version }} "$GHCR_TOKEN"
       - name: Health check
         run: |
           sleep 45
@@ -118,7 +143,7 @@ jobs:
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
 
   alert:
-    needs: [deploy, rollback]
+    needs: [verify, deploy, rollback]
     if: always() && needs.deploy.result == 'failure'
     runs-on: ubuntu-latest
     permissions:
@@ -128,14 +153,14 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const sha = '${{ inputs.version }}'.substring(0, 7);
+            const sha = '${{ needs.verify.outputs.resolved_version }}'.substring(0, 7);
             const prevSha = '${{ needs.deploy.outputs.previous_version }}'.substring(0, 7);
             const runUrl = '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}';
             const rollbackStatus = '${{ needs.rollback.result }}';
 
             const title = `Production deploy failed and rolled back: ${sha}`;
             const body = `## Production Deployment Failure\n\n` +
-              `- **Attempted version**: \`${{ inputs.version }}\`\n` +
+              `- **Attempted version**: \`${{ needs.verify.outputs.resolved_version }}\`\n` +
               `- **Rolled back to**: \`${{ needs.deploy.outputs.previous_version }}\`\n` +
               `- **Rollback status**: ${rollbackStatus}\n` +
               `- **Workflow run**: ${runUrl}\n\n` +
