@@ -42,6 +42,7 @@ services:
       - EMBEDDING_MODEL=text-embedding-3-small
       - QDRANT_HOST=${QDRANT_HOST}
       - QDRANT_PORT=${QDRANT_PORT}
+      - QDRANT_COLLECTION_PREFIX=dev
     restart: unless-stopped
     networks:
       - dev-internal
