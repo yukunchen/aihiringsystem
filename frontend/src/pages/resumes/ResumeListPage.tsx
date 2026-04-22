@@ -60,7 +60,7 @@ export default function ResumeListPage() {
       title: 'Status', dataIndex: 'status', key: 'status',
       render: (status: string) => <Tag color={STATUS_COLORS[status] ?? 'default'}>{STATUS_LABELS[status] ?? status}</Tag>,
     },
-    { title: 'Uploaded', dataIndex: 'uploadedAt', key: 'uploadedAt', render: (d: string) => new Date(d).toLocaleDateString() },
+    { title: 'Uploaded', dataIndex: 'createdAt', key: 'createdAt', render: (d: string) => (d ? new Date(d).toLocaleDateString() : '-') },
     {
       title: 'Actions', key: 'actions',
       render: (_: unknown, record: ResumeListItem) => (

@@ -1,5 +1,28 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { STATUS_COLORS, STATUS_LABELS } from './resumeStatus';
+import ResumeListPage from './ResumeListPage';
+import * as resumesApi from '../../api/resumes';
+
+vi.mock('../../api/resumes');
+
+describe('ResumeListPage date column', () => {
+  it('renders Uploaded date from createdAt (not Invalid Date)', async () => {
+    vi.mocked(resumesApi.listResumes).mockResolvedValueOnce({
+      content: [{
+        id: 'r1', fileName: 'cv.pdf', fileType: 'PDF', source: 'MANUAL',
+        status: 'UPLOADED', createdAt: '2026-04-20T10:00:00Z',
+      }],
+      totalElements: 1, totalPages: 1, number: 0, size: 10,
+    });
+    render(<MemoryRouter><ResumeListPage /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByText('cv.pdf')).toBeInTheDocument());
+    const expected = new Date('2026-04-20T10:00:00Z').toLocaleDateString();
+    expect(screen.getByText(expected)).toBeInTheDocument();
+    expect(screen.queryByText('Invalid Date')).not.toBeInTheDocument();
+  });
+});
 
 describe('STATUS_LABELS', () => {
   it('maps UPLOADED to Uploaded', () => {

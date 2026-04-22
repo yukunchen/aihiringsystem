@@ -38,7 +38,7 @@ describe('ResumeUploadPage', () => {
 
   it('uploads file and redirects to /resumes on success', async () => {
     vi.mocked(resumesApi.uploadResume).mockResolvedValueOnce({
-      id: 'r1', fileName: 'cv.pdf', fileType: 'PDF', source: 'MANUAL', status: 'UPLOADED', uploadedAt: '',
+      id: 'r1', fileName: 'cv.pdf', fileType: 'PDF', source: 'MANUAL', status: 'UPLOADED', createdAt: '',
     });
 
     render(<MemoryRouter><ResumeUploadPage /></MemoryRouter>);

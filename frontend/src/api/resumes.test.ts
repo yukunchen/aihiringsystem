@@ -84,7 +84,7 @@ describe('resumes API', () => {
 });
 
 it('uploadResume() POSTs multipart and returns resume on success', async () => {
-    const mockResume = { id: 'r1', fileName: 'cv.pdf', fileType: 'PDF', source: 'MANUAL', status: 'UPLOADED', uploadedAt: '2026-03-01T00:00:00Z' };
+    const mockResume = { id: 'r1', fileName: 'cv.pdf', fileType: 'PDF', source: 'MANUAL', status: 'UPLOADED', createdAt: '2026-03-01T00:00:00Z' };
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
       ok: true,
       status: 200,
