@@ -4,12 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { listResumes, deleteResume, downloadResume, type ResumeListItem, type Page } from '../../api/resumes';
 import { BatchUploadModal } from './BatchUploadModal';
 import { STATUS_COLORS, STATUS_LABELS } from './resumeStatus';
-
-export function formatUploadDate(d: string | null | undefined): string {
-  if (!d) return '-';
-  const parsed = new Date(d);
-  return Number.isNaN(parsed.getTime()) ? '-' : parsed.toLocaleDateString();
-}
+import { formatUploadDate } from './resumeDate';
 
 export default function ResumeListPage() {
   const navigate = useNavigate();
