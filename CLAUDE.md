@@ -56,6 +56,20 @@ JWT-based: access token (2h TTL) + refresh token (7d TTL).
 - dev/staging/prod 使用独立的 Docker 内部网络，禁止共享网络导致 DNS 冲突。
 - 部署后必须通过前端端口验证，不能只验证 backend 直连端口。
 
+## Autofix Workflow (issue-driven autonomous fixes)
+
+Before starting work on an `autofix`-labeled issue picked up from the VPS notification queue, **always claim it first**:
+
+```bash
+scripts/autofix-claim.sh <issue-number>
+```
+
+The script checks that the issue is still OPEN, has no `autofix-in-progress` label, and has no open PR that would close it; then it adds the `autofix-in-progress` label as an advisory lock. If it exits non-zero, skip the issue — another session is already on it or it has been resolved. This prevents the duplicate-fix race that produced PRs #126 and #127 for issue #125.
+
+Reason: `notify-new-issue.yml` can fire multiple times for the same issue, and there is no coordination between VPS sessions. The label acts as a cheap cross-session mutex visible on GitHub.
+
+The label is removed automatically when the fixing PR is merged (because the issue closes). If a session abandons the work without a PR, run `scripts/autofix-release.sh <issue-number>` to free the lock.
+
 ## Git Workflow
 
 - **所有进入 master 的改动都必须经过用户 review。** 这是不可违反的基本规则。无论改动多小、多紧急，一律创建 PR 等用户 merge，没有例外。
