@@ -84,6 +84,24 @@ class AiMatchingEventListenerTest {
     }
 
     @Test
+    void onResumeUploaded_unexpectedExceptionFromClient_marksVectorizationFailed() {
+        UUID resumeId = UUID.randomUUID();
+        var event = new ResumeUploadedEvent(this, resumeId, "text", "txt");
+        Resume resume = new Resume();
+        resume.setId(resumeId);
+        resume.setStatus(ResumeStatus.TEXT_EXTRACTED);
+
+        when(client.vectorizeResume(resumeId, "text"))
+            .thenThrow(new RuntimeException("boom"));
+        when(resumeRepository.findById(resumeId)).thenReturn(Optional.of(resume));
+
+        listener.onResumeUploaded(event);
+
+        assertThat(resume.getStatus()).isEqualTo(ResumeStatus.VECTORIZATION_FAILED);
+        verify(resumeRepository).save(resume);
+    }
+
+    @Test
     void onJobSaved_callsVectorizeJob() {
         UUID jobId = UUID.randomUUID();
         var event = new JobDescriptionSavedEvent(
