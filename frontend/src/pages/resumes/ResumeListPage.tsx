@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { listResumes, deleteResume, downloadResume, type ResumeListItem, type Page } from '../../api/resumes';
 import { BatchUploadModal } from './BatchUploadModal';
 import { STATUS_COLORS, STATUS_LABELS } from './resumeStatus';
+import { formatUploadDate } from './resumeDate';
 
 export default function ResumeListPage() {
   const navigate = useNavigate();
@@ -60,7 +61,7 @@ export default function ResumeListPage() {
       title: 'Status', dataIndex: 'status', key: 'status',
       render: (status: string) => <Tag color={STATUS_COLORS[status] ?? 'default'}>{STATUS_LABELS[status] ?? status}</Tag>,
     },
-    { title: 'Uploaded', dataIndex: 'createdAt', key: 'createdAt', render: (d: string) => (d ? new Date(d).toLocaleDateString() : '-') },
+    { title: 'Uploaded', dataIndex: 'createdAt', key: 'createdAt', render: formatUploadDate },
     {
       title: 'Actions', key: 'actions',
       render: (_: unknown, record: ResumeListItem) => (
