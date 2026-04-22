@@ -9,7 +9,7 @@ export interface ResumeListItem {
   fileType: string;
   source: string;
   status: string;
-  uploadedAt: string;
+  createdAt: string;
 }
 
 export async function listResumes(page: number, size: number): Promise<Page<ResumeListItem>> {

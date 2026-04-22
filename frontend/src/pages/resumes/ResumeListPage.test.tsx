@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { STATUS_COLORS, STATUS_LABELS } from './resumeStatus';
+import { formatUploadDate } from './ResumeListPage';
 
 describe('STATUS_LABELS', () => {
   it('maps UPLOADED to Uploaded', () => {
@@ -24,6 +25,29 @@ describe('STATUS_LABELS', () => {
     expect(STATUS_LABELS['PARSE_FAILED']).toBeUndefined();
     expect(STATUS_LABELS['VECTORIZING']).toBeUndefined();
     expect(STATUS_LABELS['VECTORIZED']).toBeUndefined();
+  });
+});
+
+describe('formatUploadDate', () => {
+  it('returns formatted date for a valid ISO string', () => {
+    expect(formatUploadDate('2026-04-22T04:14:25Z')).not.toBe('Invalid Date');
+    expect(formatUploadDate('2026-04-22T04:14:25Z')).not.toBe('-');
+  });
+
+  it('returns dash for null', () => {
+    expect(formatUploadDate(null)).toBe('-');
+  });
+
+  it('returns dash for undefined (covers uploadedAt/createdAt mismatch regression from issue #125)', () => {
+    expect(formatUploadDate(undefined)).toBe('-');
+  });
+
+  it('returns dash for empty string', () => {
+    expect(formatUploadDate('')).toBe('-');
+  });
+
+  it('returns dash for unparseable input instead of "Invalid Date"', () => {
+    expect(formatUploadDate('not-a-date')).toBe('-');
   });
 });
 

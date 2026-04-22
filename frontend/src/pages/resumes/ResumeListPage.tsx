@@ -5,6 +5,12 @@ import { listResumes, deleteResume, downloadResume, type ResumeListItem, type Pa
 import { BatchUploadModal } from './BatchUploadModal';
 import { STATUS_COLORS, STATUS_LABELS } from './resumeStatus';
 
+export function formatUploadDate(d: string | null | undefined): string {
+  if (!d) return '-';
+  const parsed = new Date(d);
+  return Number.isNaN(parsed.getTime()) ? '-' : parsed.toLocaleDateString();
+}
+
 export default function ResumeListPage() {
   const navigate = useNavigate();
   const [page, setPage] = useState<Page<ResumeListItem> | null>(null);
@@ -60,7 +66,7 @@ export default function ResumeListPage() {
       title: 'Status', dataIndex: 'status', key: 'status',
       render: (status: string) => <Tag color={STATUS_COLORS[status] ?? 'default'}>{STATUS_LABELS[status] ?? status}</Tag>,
     },
-    { title: 'Uploaded', dataIndex: 'uploadedAt', key: 'uploadedAt', render: (d: string) => new Date(d).toLocaleDateString() },
+    { title: 'Uploaded', dataIndex: 'createdAt', key: 'createdAt', render: formatUploadDate },
     {
       title: 'Actions', key: 'actions',
       render: (_: unknown, record: ResumeListItem) => (
