@@ -35,7 +35,8 @@ public class MatchController {
             throw new BusinessException(503, "AI matching service unavailable");
         }
 
-        // Look up candidate names for all matched resumes
+        // Look up candidate names for all matched resumes, and filter out stale
+        // resume_ids (present in vector store but no longer in DB).
         Map<String, String> nameMap = new HashMap<>();
         List<UUID> resumeIds = new ArrayList<>();
         for (var item : aiResponse.getResults()) {
@@ -54,6 +55,16 @@ public class MatchController {
         }
 
         var results = aiResponse.getResults().stream()
+            .filter(item -> {
+                // Drop UUID-form resume_ids that don't exist in the DB (stale vector entries).
+                // Non-UUID ids are left alone for backwards compatibility with test fixtures.
+                try {
+                    UUID.fromString(item.getResumeId());
+                    return nameMap.containsKey(item.getResumeId());
+                } catch (IllegalArgumentException e) {
+                    return true;
+                }
+            })
             .map(item -> new MatchResultItem(
                 item.getResumeId(),
                 nameMap.getOrDefault(item.getResumeId(), item.getResumeId().length() > 8 ? item.getResumeId().substring(0, 8) : item.getResumeId()),
