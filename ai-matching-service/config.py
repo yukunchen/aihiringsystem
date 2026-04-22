@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     vector_size: int = 1536
     qdrant_host: str = "localhost"
     qdrant_port: int = 6333
+    qdrant_collection_prefix: str = ""
     port: int = 8001
     log_level: str = "info"
 
