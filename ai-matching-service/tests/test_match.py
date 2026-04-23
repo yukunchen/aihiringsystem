@@ -124,3 +124,42 @@ def test_match_deduplicates_same_resume(client):
 def test_match_top_k_max_50(client):
     response = client.post("/match", json={"job_id": "job-999", "top_k": 51})
     assert response.status_code == 422
+
+
+def test_match_skips_candidates_when_llm_fails(client):
+    """Regression for issue #134: a single LLM failure must not crash the whole request."""
+    job_record = _make_job_record("job-006")
+    candidates = [
+        _make_scored_point("resume-a", 0.85, "Alice Java"),
+        _make_scored_point("resume-b", 0.80, "Bob Python"),
+    ]
+    # First LLM call raises, second succeeds — overall response should still be 200
+    good_score = MatchScore(score=75, reasoning="OK", highlights=["Python"])
+
+    with patch("services.vector_store.get_job_record", new=AsyncMock(return_value=job_record)), \
+         patch("services.vector_store.search_resumes", new=AsyncMock(return_value=candidates)), \
+         patch("services.llm.score_match", new=AsyncMock(side_effect=[RuntimeError("LLM timeout"), good_score])):
+        response = client.post("/match", json={"job_id": "job-006", "top_k": 5})
+
+    assert response.status_code == 200
+    results = response.json()["results"]
+    assert len(results) == 1
+    assert results[0]["resume_id"] == "resume-b"
+    assert results[0]["llm_score"] == 75
+
+
+def test_match_tolerates_missing_payload_fields(client):
+    """Regression for issue #134: job records with missing title/description fields must not crash."""
+    job_record = MagicMock()
+    job_record.vector = [0.1] * 1536
+    job_record.payload = {"job_id": "job-007"}  # no title / description
+    candidates = [_make_scored_point("resume-a", 0.9, "Engineer")]
+    good_score = MatchScore(score=50, reasoning="Partial", highlights=[])
+
+    with patch("services.vector_store.get_job_record", new=AsyncMock(return_value=job_record)), \
+         patch("services.vector_store.search_resumes", new=AsyncMock(return_value=candidates)), \
+         patch("services.llm.score_match", new=AsyncMock(return_value=good_score)):
+        response = client.post("/match", json={"job_id": "job-007", "top_k": 3})
+
+    assert response.status_code == 200
+    assert len(response.json()["results"]) == 1
