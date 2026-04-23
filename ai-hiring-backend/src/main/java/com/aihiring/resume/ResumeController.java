@@ -71,6 +71,9 @@ public class ResumeController {
             try {
                 Resume resume = resumeService.uploadSingle(files[0], source, currentUser.getId());
                 return ResponseEntity.ok(ApiResponse.success(ResumeResponse.from(resume)));
+            } catch (DuplicateResumeException e) {
+                return ResponseEntity.status(409)
+                    .body(ApiResponse.error(409, e.getMessage()));
             } catch (BusinessException e) {
                 return ResponseEntity.badRequest()
                     .body(ApiResponse.error(400, e.getMessage()));
@@ -88,6 +91,9 @@ public class ResumeController {
             try {
                 Resume resume = resumeService.uploadSingle(file, source, currentUser.getId());
                 results.add(new BatchUploadResult(i, file.getOriginalFilename(), resume.getStatus().name(), resume.getId(), null));
+            } catch (DuplicateResumeException e) {
+                results.add(new BatchUploadResult(i, file.getOriginalFilename(), "DUPLICATE", e.getExistingResumeId(),
+                    "Duplicate of existing resume: " + e.getExistingFileName()));
             } catch (BusinessException e) {
                 results.add(new BatchUploadResult(i, file.getOriginalFilename(), "FAILED", null, e.getMessage()));
             } catch (Exception e) {

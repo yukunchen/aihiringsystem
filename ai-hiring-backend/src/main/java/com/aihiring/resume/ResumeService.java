@@ -20,6 +20,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -59,6 +62,12 @@ public class ResumeService {
         var user = userRepository.findById(uploadedByUserId)
             .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
+        byte[] fileBytes = file.getBytes();
+        String fileHash = sha256Hex(fileBytes);
+        resumeRepository.findFirstByFileHash(fileHash).ifPresent(existing -> {
+            throw new DuplicateResumeException(existing.getId(), existing.getFileName());
+        });
+
         String extension = TYPE_EXTENSIONS.get(file.getContentType());
         String storedName = UUID.randomUUID() + "." + extension;
         String storedPath = fileStorageService.store(file, storedName);
@@ -67,7 +76,7 @@ public class ResumeService {
         ResumeStatus status = ResumeStatus.UPLOADED;
         try {
             TextExtractor extractor = getExtractor(file.getContentType());
-            rawText = extractor.extract(new ByteArrayInputStream(file.getBytes()));
+            rawText = extractor.extract(new ByteArrayInputStream(fileBytes));
             status = ResumeStatus.TEXT_EXTRACTED;
         } catch (Exception e) {
             log.warn("Text extraction failed for file: {}. Saving with UPLOADED status.", file.getOriginalFilename(), e);
@@ -78,6 +87,7 @@ public class ResumeService {
         resume.setFilePath(storedPath);
         resume.setFileSize(file.getSize());
         resume.setFileType(file.getContentType());
+        resume.setFileHash(fileHash);
         resume.setRawText(rawText);
         resume.setSource(source);
         resume.setStatus(status);
@@ -86,6 +96,15 @@ public class ResumeService {
         resume = resumeRepository.save(resume);
         eventPublisher.publishEvent(new ResumeUploadedEvent(this, resume.getId(), rawText, file.getContentType()));
         return resume;
+    }
+
+    private static String sha256Hex(byte[] data) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(md.digest(data));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
     }
 
     @Transactional

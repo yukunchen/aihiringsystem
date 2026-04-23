@@ -13,7 +13,7 @@ interface BatchUploadModalProps {
 interface FileItem {
   uid: string;
   file: File;
-  status: 'pending' | 'uploading' | 'done' | 'error';
+  status: 'pending' | 'uploading' | 'done' | 'duplicate' | 'error';
   error?: string;
   result?: BatchUploadResponse['results'][number];
 }
@@ -54,15 +54,24 @@ export function BatchUploadModal({ open, onClose, onSuccess }: BatchUploadModalP
           const r = resultMap.get(f.file.name);
           if (!r) return { ...f, status: 'error' as const, error: 'No result returned' };
           const succeeded = r.status === 'UPLOADED' || r.status === 'TEXT_EXTRACTED';
+          const duplicate = r.status === 'DUPLICATE';
           return {
             ...f,
-            status: succeeded ? ('done' as const) : ('error' as const),
+            status: succeeded
+              ? ('done' as const)
+              : duplicate
+                ? ('duplicate' as const)
+                : ('error' as const),
             error: r.error ?? undefined,
             result: r,
           };
         })
       );
-      message.success(`Uploaded ${result.succeeded}/${result.total} resumes`);
+      const dupCount = result.duplicated ?? 0;
+      message.success(
+        `Uploaded ${result.succeeded}/${result.total} resumes` +
+          (dupCount > 0 ? ` (${dupCount} duplicate${dupCount > 1 ? 's' : ''} skipped)` : '')
+      );
       if (result.succeeded > 0) onSuccess();
     } catch (err) {
       message.error('Upload failed: ' + (err as Error).message);
@@ -126,6 +135,10 @@ export function BatchUploadModal({ open, onClose, onSuccess }: BatchUploadModalP
                 description={
                   item.status === 'error' ? (
                     <span style={{ color: 'red' }}>{item.error}</span>
+                  ) : item.status === 'duplicate' ? (
+                    <span style={{ color: 'orange' }}>
+                      {item.error ?? 'Duplicate (already exists)'}
+                    </span>
                   ) : item.status === 'done' ? (
                     <span style={{ color: 'green' }}>Uploaded</span>
                   ) : item.status === 'uploading' ? (

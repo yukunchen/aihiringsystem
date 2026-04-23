@@ -105,6 +105,47 @@ class ResumeServiceTest {
     }
 
     @Test
+    void uploadSingle_withDuplicateHash_shouldThrowDuplicateResumeException() throws IOException {
+        MockMultipartFile file = new MockMultipartFile("file", "resume.pdf", "application/pdf", "identical bytes".getBytes());
+        UUID userId = UUID.randomUUID();
+        User user = new User(); user.setId(userId);
+
+        UUID existingId = UUID.randomUUID();
+        Resume existing = new Resume();
+        existing.setId(existingId);
+        existing.setFileName("earlier.pdf");
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(resumeRepository.findFirstByFileHash(any())).thenReturn(Optional.of(existing));
+
+        DuplicateResumeException ex = assertThrows(DuplicateResumeException.class,
+            () -> resumeService.uploadSingle(file, ResumeSource.MANUAL, userId));
+        assertEquals(existingId, ex.getExistingResumeId());
+        assertEquals("earlier.pdf", ex.getExistingFileName());
+        assertEquals(409, ex.getCode());
+        verify(resumeRepository, never()).save(any(Resume.class));
+        verify(fileStorageService, never()).store(any(), any());
+    }
+
+    @Test
+    void uploadSingle_shouldStoreFileHashOnResume() throws IOException {
+        MockMultipartFile file = new MockMultipartFile("file", "resume.pdf", "application/pdf", "pdf bytes".getBytes());
+        UUID userId = UUID.randomUUID();
+        User user = new User(); user.setId(userId);
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(resumeRepository.findFirstByFileHash(any())).thenReturn(Optional.empty());
+        when(fileStorageService.store(eq(file), any(String.class))).thenReturn("/uploads/resumes/uuid.pdf");
+        when(pdfTextExtractor.extract(any())).thenReturn("text");
+        when(resumeRepository.save(any(Resume.class))).thenAnswer(i -> { Resume r = i.getArgument(0); r.setId(UUID.randomUUID()); return r; });
+
+        Resume result = resumeService.uploadSingle(file, ResumeSource.MANUAL, userId);
+
+        assertNotNull(result.getFileHash());
+        assertEquals(64, result.getFileHash().length()); // SHA-256 hex
+    }
+
+    @Test
     void upload_withEmptyFile_shouldThrowBusinessException() {
         MockMultipartFile file = new MockMultipartFile("file", "resume.pdf", "application/pdf", new byte[0]);
         assertThrows(BusinessException.class, () -> resumeService.upload(file, ResumeSource.MANUAL, UUID.randomUUID()));

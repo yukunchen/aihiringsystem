@@ -31,6 +31,9 @@ public class Resume extends BaseEntity {
     @Column(name = "raw_text", columnDefinition = "TEXT")
     private String rawText;
 
+    @Column(name = "file_hash", length = 64)
+    private String fileHash;
+
     @Enumerated(EnumType.STRING)
     @JdbcType(PostgreSQLEnumJdbcType.class)
     @Column(nullable = false)
