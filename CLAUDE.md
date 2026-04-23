@@ -80,6 +80,8 @@ The label is removed automatically when the fixing PR is merged (because the iss
 
 **Out-of-band push to Discord.** `scripts/discord-notify-watcher.sh` is a systemd-managed daemon (`ai-hiring-discord-notify.service`) that polls the orchestrator queue every 5s, POSTs unpushed `orchestrator`-targeted entries to a Discord webhook, and sets `pushed_discord: true` on each delivered entry. It uses a separate flag from `read` so the orchestrator hook can still pick the same entry up for in-session context. Webhook URL lives in `/etc/ai-hiring/discord.env` (chmod 600, never committed).
 
+**Fixer failure handling.** `scripts/autofix-issue.sh` captures `claude -p` exit status explicitly (not via `PIPESTATUS` in a `tee` pipeline — that path gets killed by `set -e` before cleanup can run). On any failure (claude errored, zero commits, push failed, pr-create failed), the script: (1) removes the worktree + local branch; (2) calls `autofix-release.sh` to drop the `autofix-in-progress` label; (3) writes a `type=autofix_fail`, `target=orchestrator` entry to the orchestrator queue so Discord/the orchestrator hook surface it to the human. Override `MAX_TURNS` env var for complex issues (default 80).
+
 ## Git Workflow
 
 - **所有进入 master 的改动都必须经过用户 review。** 这是不可违反的基本规则。无论改动多小、多紧急，一律创建 PR 等用户 merge，没有例外。
