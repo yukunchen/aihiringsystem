@@ -124,8 +124,38 @@ jobs:
 
           echo "Production deployment successful"
 
+      - name: Notify orchestrator (success)
+        if: success()
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: SHA,RUN_URL
+          script: |
+            python3 << 'PYEOF'
+            import json, datetime, os
+            entry = {
+              'id': 'prod-' + os.environ['SHA'][:7],
+              'timestamp': datetime.datetime.utcnow().isoformat() + 'Z',
+              'read': False,
+              'type': 'deploy',
+              'target': 'orchestrator',
+              'message': f"🚀 Production Deploy Complete — commit {os.environ['SHA'][:7]}",
+              'details': 'Backend + AI service health checks passed.',
+              'run_url': os.environ.get('RUN_URL', '')
+            }
+            queue = '/opt/ai-hiring/notifications/orchestrator-queue.jsonl'
+            os.makedirs(os.path.dirname(queue), exist_ok=True)
+            with open(queue, 'a') as f:
+                f.write(json.dumps(entry) + '\n')
+            PYEOF
+        env:
+          SHA: ${{ needs.verify.outputs.resolved_version }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
   rollback:
-    needs: deploy
+    needs: [verify, deploy]
     if: failure()
     runs-on: ubuntu-latest
     steps:
@@ -141,6 +171,48 @@ jobs:
             /opt/ai-hiring/scripts/rollback.sh prod "${{ needs.deploy.outputs.previous_version }}" || echo "Rollback failed - manual intervention required"
         env:
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Notify orchestrator (rolled back)
+        if: always()
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: SHA,PREV,RUN_URL,ROLLBACK_RESULT
+          script: |
+            python3 << 'PYEOF'
+            import json, datetime, os
+            ok = os.environ.get('ROLLBACK_RESULT') == 'success'
+            sha = os.environ['SHA'][:7]
+            prev = (os.environ.get('PREV') or '')[:7]
+            entry = {
+              'id': 'prod-rollback-' + sha,
+              'timestamp': datetime.datetime.utcnow().isoformat() + 'Z',
+              'read': False,
+              'type': 'deploy_fail',
+              'target': 'orchestrator',
+              'message': (
+                  f"🔄 Production Rolled Back — {sha} → {prev}" if ok
+                  else f"🚨 Production Deploy FAILED and rollback FAILED — {sha} (manual action required)"
+              ),
+              'details': (
+                  f'Deploy of {sha} failed health checks; rolled back to {prev}.'
+                  if ok else
+                  f'Deploy of {sha} failed AND rollback also failed. Production may be in a broken state.'
+              ),
+              'run_url': os.environ.get('RUN_URL', '')
+            }
+            queue = '/opt/ai-hiring/notifications/orchestrator-queue.jsonl'
+            os.makedirs(os.path.dirname(queue), exist_ok=True)
+            with open(queue, 'a') as f:
+                f.write(json.dumps(entry) + '\n')
+            PYEOF
+        env:
+          SHA: ${{ needs.verify.outputs.resolved_version }}
+          PREV: ${{ needs.deploy.outputs.previous_version }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ROLLBACK_RESULT: ${{ job.status }}
 
   alert:
     needs: [verify, deploy, rollback]
