@@ -131,8 +131,11 @@ jobs:
           fi
 
           # 2. Resume upload
+          #    Must produce a unique payload each run — since PR #142
+          #    landed a SHA-256 file-hash dedup, a constant test payload
+          #    gets rejected with HTTP 409 from the second deploy onward.
           if [ -n "$TOKEN" ]; then
-            echo "smoke test resume" > /tmp/smoke.txt
+            echo "smoke test resume ${GITHUB_RUN_ID} ${GITHUB_SHA} $(date +%s%N)" > /tmp/smoke.txt
             UPLOAD=$(curl -sf -X POST "$BASE/api/resumes/upload" \
               -H "Authorization: Bearer $TOKEN" \
               -F "file=@/tmp/smoke.txt;type=text/plain" || echo '{}')
@@ -286,6 +289,18 @@ jobs:
           SHA: ${{ github.sha }}
           DETAILS: ${{ steps.smoke.outputs.details }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Fail the job if any smoke check failed
+        # Placed AFTER the orchestrator-notify step so Discord still
+        # receives the failure ping. Without this, smoke setting
+        # PASS=false would still leave the verify job green — the GH
+        # Actions UI misreported success and report-failure never ran
+        # even though Discord knew the truth. Propagating here keeps
+        # the UI and the notifier in sync and gates e2e + report-failure.
+        if: steps.smoke.outputs.pass != 'true'
+        run: |
+          echo "::error::Staging smoke test failed — see 'Smoke test staging' step for details"
+          exit 1
 
       - name: Trigger Verifier Agent on VPS
         if: steps.smoke.outputs.pass == 'true' && steps.linked.outputs.issues != ''
