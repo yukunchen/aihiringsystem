@@ -2,6 +2,7 @@ package com.aihiring.resume;
 
 import com.aihiring.common.security.UserDetailsImpl;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -313,6 +314,45 @@ class ResumeControllerIntegrationTest {
                 .andExpect(jsonPath("$.data.results[1].error").exists())
                 .andExpect(jsonPath("$.data.results[2].fileName").value("good2.txt"))
                 .andExpect(jsonPath("$.data.results[2].status").value("TEXT_EXTRACTED"));
+    }
+
+    @Test
+    void download_withAsciiFileName_shouldReturnFileContent() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+            "file", "download-ascii.txt", "text/plain", "download me".getBytes()
+        );
+        MvcResult uploadResult = mockMvc.perform(multipart("/api/resumes/upload")
+                .file(file)
+                .with(adminUser()))
+                .andReturn();
+        String responseBody = uploadResult.getResponse().getContentAsString();
+        String id = responseBody.split("\"id\":\"")[1].split("\"")[0];
+
+        mockMvc.perform(get("/api/resumes/" + id + "/download")
+                .with(adminUser()))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION,
+                    org.hamcrest.Matchers.containsString("download-ascii.txt")));
+    }
+
+    @Test
+    void download_withChineseFileName_shouldReturn200AndEncodedHeader() throws Exception {
+        // Chinese filename must not break Content-Disposition header (Tomcat rejects non-ISO-8859-1)
+        MockMultipartFile file = new MockMultipartFile(
+            "file", "张三简历.txt", "text/plain", "简历内容 download me".getBytes(java.nio.charset.StandardCharsets.UTF_8)
+        );
+        MvcResult uploadResult = mockMvc.perform(multipart("/api/resumes/upload")
+                .file(file)
+                .with(adminUser()))
+                .andReturn();
+        String responseBody = uploadResult.getResponse().getContentAsString();
+        String id = responseBody.split("\"id\":\"")[1].split("\"")[0];
+
+        mockMvc.perform(get("/api/resumes/" + id + "/download")
+                .with(adminUser()))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION,
+                    org.hamcrest.Matchers.containsString("filename*=UTF-8''")));
     }
 
     @Test
