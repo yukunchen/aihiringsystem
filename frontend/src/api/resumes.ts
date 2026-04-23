@@ -69,6 +69,7 @@ export interface BatchUploadResponse {
   total: number;
   succeeded: number;
   failed: number;
+  duplicated: number;
   results: BatchUploadResult[];
 }
 

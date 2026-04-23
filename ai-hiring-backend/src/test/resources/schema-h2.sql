@@ -90,6 +90,7 @@ CREATE TABLE IF NOT EXISTS resumes (
     experience CLOB,
     projects CLOB,
     skills CLOB,
+    file_hash VARCHAR(64),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -98,6 +99,7 @@ CREATE INDEX IF NOT EXISTS idx_resumes_source ON resumes(source);
 CREATE INDEX IF NOT EXISTS idx_resumes_status ON resumes(status);
 CREATE INDEX IF NOT EXISTS idx_resumes_uploaded_by ON resumes(uploaded_by);
 CREATE INDEX IF NOT EXISTS idx_resumes_created_at ON resumes(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_resumes_file_hash ON resumes(file_hash);
 
 -- Job Descriptions (H2-compatible: VARCHAR instead of enum, CLOB instead of JSONB)
 CREATE TABLE IF NOT EXISTS job_descriptions (

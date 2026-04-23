@@ -68,6 +68,42 @@ class ResumeControllerIntegrationTest {
     }
 
     @Test
+    void upload_sameFileTwice_secondShouldReturn409() throws Exception {
+        byte[] bytes = ("Duplicate Test " + UUID.randomUUID() + "\nContent").getBytes();
+        MockMultipartFile first = new MockMultipartFile("file", "dup-a.txt", "text/plain", bytes);
+        MockMultipartFile second = new MockMultipartFile("file", "dup-b.txt", "text/plain", bytes);
+
+        mockMvc.perform(multipart("/api/resumes/upload").file(first).with(adminUser()))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(multipart("/api/resumes/upload").file(second).with(adminUser()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(409));
+    }
+
+    @Test
+    void upload_batchWithDuplicate_shouldMarkAsDuplicate() throws Exception {
+        byte[] bytes = ("Batch Dup " + UUID.randomUUID() + "\nContent").getBytes();
+        MockMultipartFile seed = new MockMultipartFile("files", "seed.txt", "text/plain", bytes);
+        MockMultipartFile again = new MockMultipartFile("files", "again.txt", "text/plain", bytes);
+        MockMultipartFile fresh = new MockMultipartFile("files", "fresh.txt", "text/plain",
+            ("Fresh " + UUID.randomUUID()).getBytes());
+
+        // seed first
+        mockMvc.perform(multipart("/api/resumes/upload").file(seed).with(adminUser()))
+                .andExpect(status().isOk());
+
+        // batch with one duplicate and one new
+        mockMvc.perform(multipart("/api/resumes/upload")
+                .file(again)
+                .file(fresh)
+                .with(adminUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.duplicated").value(1))
+                .andExpect(jsonPath("$.data.results[?(@.fileName=='again.txt')].status").value("DUPLICATE"));
+    }
+
+    @Test
     void upload_withEmptyFile_shouldReturn400() throws Exception {
         MockMultipartFile file = new MockMultipartFile(
             "file", "empty.txt", "text/plain", new byte[0]
