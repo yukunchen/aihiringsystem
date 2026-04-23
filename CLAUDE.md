@@ -78,6 +78,8 @@ The label is removed automatically when the fixing PR is merged (because the iss
 
 **PR-ready pings (orchestrator).** `.github/workflows/notify-pr-ready.yml` writes a `pr_ready` entry to the orchestrator queue whenever a non-draft PR is opened, so the orchestrator surfaces pending reviews to the human on the next prompt. Do not merge on the human's behalf — per the Git Workflow rule below, every merge is a human decision.
 
+**Out-of-band push to Discord.** `scripts/discord-notify-watcher.sh` is a systemd-managed daemon (`ai-hiring-discord-notify.service`) that polls the orchestrator queue every 5s, POSTs unpushed `orchestrator`-targeted entries to a Discord webhook, and sets `pushed_discord: true` on each delivered entry. It uses a separate flag from `read` so the orchestrator hook can still pick the same entry up for in-session context. Webhook URL lives in `/etc/ai-hiring/discord.env` (chmod 600, never committed).
+
 ## Git Workflow
 
 - **所有进入 master 的改动都必须经过用户 review。** 这是不可违反的基本规则。无论改动多小、多紧急，一律创建 PR 等用户 merge，没有例外。
