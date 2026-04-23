@@ -343,21 +343,44 @@ jobs:
           path: e2e-tests/playwright-report/
 
   report-failure:
-    needs: [deploy, verify]
+    # Include earlier jobs so a build-and-push failure (e.g., the Gradle
+    # timeout on da531b7) also triggers this — previously the needs list
+    # only covered deploy/verify and such early failures were invisible
+    # to the report handler.
+    needs: [ci, build-and-push, deploy, verify]
     if: failure()
     runs-on: ubuntu-latest
     permissions:
       issues: write
     steps:
+      - name: Determine failed stage
+        id: stage
+        run: |
+          # Use job result inputs to name the first failing stage so the
+          # issue body and Discord ping are actionable.
+          if [ "${{ needs.ci.result }}" = "failure" ]; then
+            echo "stage=ci" >> "$GITHUB_OUTPUT"
+          elif [ "${{ needs.build-and-push.result }}" = "failure" ]; then
+            echo "stage=build-and-push" >> "$GITHUB_OUTPUT"
+          elif [ "${{ needs.deploy.result }}" = "failure" ]; then
+            echo "stage=deploy" >> "$GITHUB_OUTPUT"
+          elif [ "${{ needs.verify.result }}" = "failure" ]; then
+            echo "stage=verify" >> "$GITHUB_OUTPUT"
+          else
+            echo "stage=unknown" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create failure issue
         uses: actions/github-script@v7
         with:
           script: |
             const sha = '${{ github.sha }}'.substring(0, 7);
+            const stage = '${{ steps.stage.outputs.stage }}';
             const runUrl = '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}';
-            const title = `Staging deploy failed: commit ${sha}`;
+            const title = `Staging deploy failed at ${stage}: commit ${sha}`;
             const body = `## Deployment Failure\n\n` +
               `- **Environment**: staging\n` +
+              `- **Failed stage**: \`${stage}\`\n` +
               `- **Branch**: master\n` +
               `- **Commit**: \`${{ github.sha }}\`\n` +
               `- **Workflow run**: ${runUrl}\n\n` +
@@ -380,3 +403,36 @@ jobs:
               body: body,
               labels: ['bug', 'deployment']
             });
+
+      - name: Notify orchestrator (failure)
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: SHA,STAGE,RUN_URL
+          script: |
+            python3 << 'PYEOF'
+            import json, datetime, os
+            sha = os.environ['SHA'][:7]
+            stage = os.environ['STAGE']
+            entry = {
+              'id': 'staging-fail-' + sha,
+              'timestamp': datetime.datetime.utcnow().isoformat() + 'Z',
+              'read': False,
+              'type': 'deploy_fail',
+              'target': 'orchestrator',
+              'message': f"❌ Staging Deploy FAILED at {stage} — commit {sha}",
+              'details': f"Stage `{stage}` failed for staging deploy of {sha}. "
+                         f"An auto-issue has been filed with run logs.",
+              'run_url': os.environ.get('RUN_URL', '')
+            }
+            queue = '/opt/ai-hiring/notifications/orchestrator-queue.jsonl'
+            os.makedirs(os.path.dirname(queue), exist_ok=True)
+            with open(queue, 'a') as f:
+                f.write(json.dumps(entry) + '\n')
+            PYEOF
+        env:
+          SHA: ${{ github.sha }}
+          STAGE: ${{ steps.stage.outputs.stage }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
