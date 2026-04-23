@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
 
 import java.util.*;
@@ -33,13 +34,18 @@ public class MatchController {
             throw new BusinessException(422, "Job not ready for matching, please try again shortly");
         } catch (ResourceAccessException e) {
             throw new BusinessException(503, "AI matching service unavailable");
+        } catch (HttpServerErrorException e) {
+            throw new BusinessException(502, "AI matching service error, please try again shortly");
         }
+
+        List<AiMatchResultItem> aiResults = aiResponse == null || aiResponse.getResults() == null
+            ? List.of() : aiResponse.getResults();
 
         // Look up candidate names for all matched resumes, and filter out stale
         // resume_ids (present in vector store but no longer in DB).
         Map<String, String> nameMap = new HashMap<>();
         List<UUID> resumeIds = new ArrayList<>();
-        for (var item : aiResponse.getResults()) {
+        for (var item : aiResults) {
             try {
                 resumeIds.add(UUID.fromString(item.getResumeId()));
             } catch (IllegalArgumentException ignored) { }
@@ -54,7 +60,7 @@ public class MatchController {
             });
         }
 
-        var results = aiResponse.getResults().stream()
+        var results = aiResults.stream()
             .filter(item -> {
                 // Drop UUID-form resume_ids that don't exist in the DB (stale vector entries).
                 // Non-UUID ids are left alone for backwards compatibility with test fixtures.

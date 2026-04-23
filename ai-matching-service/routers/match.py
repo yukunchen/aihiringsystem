@@ -1,8 +1,10 @@
 import asyncio
+import logging
 from fastapi import APIRouter, HTTPException
 from schemas import MatchRequest, MatchResponse, MatchResultItem
 from services import vector_store, llm
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -20,7 +22,7 @@ async def match_resumes(request: MatchRequest):
     seen_texts: dict[str, object] = {}
     candidates = []
     for c in raw_candidates:
-        text = c.payload.get("raw_text", "")
+        text = (c.payload or {}).get("raw_text") or ""
         text_key = text[:200]  # Use first 200 chars as dedup key
         if text_key not in seen_texts:
             seen_texts[text_key] = True
@@ -28,15 +30,17 @@ async def match_resumes(request: MatchRequest):
         if len(candidates) >= request.top_k * 2:
             break
 
-    payload = job_record.payload
-    job_text = f"Title: {payload['title']}\n\nDescription:\n{payload['description']}"
+    payload = job_record.payload or {}
+    title = payload.get("title") or ""
+    description = payload.get("description") or ""
+    job_text = f"Title: {title}\n\nDescription:\n{description}"
     if payload.get("requirements"):
         job_text += f"\n\nRequirements:\n{payload['requirements']}"
     if payload.get("skills"):
         job_text += f"\n\nRequired Skills: {payload['skills']}"
 
     async def score_candidate(candidate):
-        resume_text = candidate.payload.get("raw_text", "")
+        resume_text = (candidate.payload or {}).get("raw_text") or ""
         score = await llm.score_match(job_text, resume_text)
         return MatchResultItem(
             resume_id=str(candidate.id),
@@ -46,6 +50,20 @@ async def match_resumes(request: MatchRequest):
             highlights=score.highlights,
         )
 
-    results = await asyncio.gather(*[score_candidate(c) for c in candidates])
+    # Use return_exceptions so a single LLM failure (timeout, rate limit, bad JSON)
+    # does not fail the whole match request with HTTP 500.
+    raw_results = await asyncio.gather(
+        *[score_candidate(c) for c in candidates],
+        return_exceptions=True,
+    )
+    results: list[MatchResultItem] = []
+    for candidate, outcome in zip(candidates, raw_results):
+        if isinstance(outcome, Exception):
+            logger.warning(
+                "score_match failed for resume_id=%s job_id=%s: %s",
+                candidate.id, request.job_id, outcome,
+            )
+            continue
+        results.append(outcome)
     ranked = sorted(results, key=lambda r: r.llm_score, reverse=True)
     return MatchResponse(job_id=request.job_id, results=ranked[: request.top_k])
