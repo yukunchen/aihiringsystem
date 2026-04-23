@@ -28,6 +28,10 @@ services:
     depends_on:
       - ai-matching
     restart: unless-stopped
+    # Persist uploaded resume files — mirrors the fix for issue #143 in
+    # staging/prod so dev behaves the same way.
+    volumes:
+      - dev-resume-uploads:/app/uploads
     networks:
       - dev-internal
       - ai-hiring-network
@@ -52,3 +56,6 @@ networks:
   dev-internal:
   ai-hiring-network:
     external: true
+
+volumes:
+  dev-resume-uploads:

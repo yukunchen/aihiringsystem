@@ -29,6 +29,11 @@ services:
     depends_on:
       - ai-matching
     restart: always
+    # Persist uploaded resume files across container recreates — without
+    # a volume here, every redeploy wipes /app/uploads and download
+    # endpoints return 404 for all pre-existing resumes (issue #143).
+    volumes:
+      - prod-resume-uploads:/app/uploads
     networks:
       - prod-internal
       - ai-hiring-network
@@ -54,3 +59,6 @@ networks:
   prod-internal:
   ai-hiring-network:
     external: true
+
+volumes:
+  prod-resume-uploads:
