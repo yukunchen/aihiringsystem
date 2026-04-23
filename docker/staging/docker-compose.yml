@@ -27,6 +27,12 @@ services:
     depends_on:
       - ai-matching
     restart: unless-stopped
+    # Persist uploaded resume files across container recreates.
+    # Without this, every redeploy wipes /app/uploads and the resume
+    # rows in Postgres point at files that no longer exist — the
+    # /resumes/{id}/download endpoint then 404s (observed in issue #143).
+    volumes:
+      - staging-resume-uploads:/app/uploads
     networks:
       - staging-internal
       - ai-hiring-network
@@ -51,3 +57,6 @@ networks:
   staging-internal:
   ai-hiring-network:
     external: true
+
+volumes:
+  staging-resume-uploads:

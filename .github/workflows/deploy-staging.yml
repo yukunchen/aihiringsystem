@@ -130,21 +130,39 @@ jobs:
             echo "DEBUG permissions: $ME_PERMS"
           fi
 
-          # 2. Resume upload
-          #    Must produce a unique payload each run — since PR #142
-          #    landed a SHA-256 file-hash dedup, a constant test payload
-          #    gets rejected with HTTP 409 from the second deploy onward.
+          # 2. Resume upload + download round-trip.
+          #    Unique payload per run because PR #142 landed SHA-256
+          #    file-hash dedup. Follow-up download check guards against
+          #    the class of bug in issue #143 where uploads worked but
+          #    the saved file was lost on next redeploy (no persistent
+          #    volume mount), so /resumes/{id}/download returned 404.
           if [ -n "$TOKEN" ]; then
             echo "smoke test resume ${GITHUB_RUN_ID} ${GITHUB_SHA} $(date +%s%N)" > /tmp/smoke.txt
             UPLOAD=$(curl -sf -X POST "$BASE/api/resumes/upload" \
               -H "Authorization: Bearer $TOKEN" \
               -F "file=@/tmp/smoke.txt;type=text/plain" || echo '{}')
             CODE=$(echo "$UPLOAD" | python3 -c "import sys,json; print(json.load(sys.stdin).get('code',''))" 2>/dev/null)
+            RESUME_ID=$(echo "$UPLOAD" | python3 -c "import sys,json; d=json.load(sys.stdin).get('data') or {}; print(d.get('id',''))" 2>/dev/null)
             if [ "$CODE" = "200" ]; then
               DETAILS="${DETAILS}\n- ✅ Resume upload"
             else
               PASS=false
               DETAILS="${DETAILS}\n- ❌ Resume upload (response: $CODE)"
+            fi
+
+            # Download the just-uploaded resume to verify file storage is
+            # actually persistent end-to-end.
+            if [ -n "$RESUME_ID" ]; then
+              DL_HTTP=$(curl -s -o /tmp/smoke-dl.bin -w "%{http_code}" \
+                "$BASE/api/resumes/${RESUME_ID}/download" \
+                -H "Authorization: Bearer $TOKEN")
+              DL_SIZE=$(wc -c < /tmp/smoke-dl.bin 2>/dev/null || echo 0)
+              if [ "$DL_HTTP" = "200" ] && [ "$DL_SIZE" -gt 0 ]; then
+                DETAILS="${DETAILS}\n- ✅ Resume download (${DL_SIZE} bytes)"
+              else
+                PASS=false
+                DETAILS="${DETAILS}\n- ❌ Resume download (HTTP=$DL_HTTP, size=$DL_SIZE)"
+              fi
             fi
           fi
 
