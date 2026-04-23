@@ -59,10 +59,12 @@ case "$ROLE" in
         ;;
     orchestrator)
         QUEUES_ORDER="$QUEUE_ORCHESTRATOR $QUEUE_ISSUES"
-        # Orchestrator handles PR pings + generic deploy notifications.
-        # new_issue belongs to the fixer role — leave those untouched so
-        # the fixer session can consume them.
-        ALLOWED_TYPES="pr_ready,deploy,"
+        # Orchestrator handles PR pings, deploy notifications (success
+        # + failure), and autofix failure alerts. `new_issue` belongs to
+        # the fixer role — leave those untouched so the fixer session
+        # can consume them. The trailing empty entry matches untyped
+        # legacy entries.
+        ALLOWED_TYPES="pr_ready,deploy,deploy_fail,autofix_fail,"
         ;;
     *)
         QUEUES_ORDER="$QUEUE_ISSUES"
@@ -150,6 +152,19 @@ $MESSAGE
 $DETAILS
 
 Surface this to the user so they can review and merge. Do not merge on their behalf."
+        ;;
+    autofix_fail)
+        CONTEXT="An autofix attempt FAILED. The fixer has already released
+its advisory lock and cleaned up, so the issue is re-eligible for
+another run if the user wants to retry.
+
+$MESSAGE
+
+$DETAILS
+
+Surface this to the user immediately so they can decide whether to
+raise MAX_TURNS, clarify the issue, or fix it manually. Do NOT start
+fixing it yourself — that is the fixer role's job."
         ;;
     *)
         CONTEXT="Notification from deployment pipeline:
