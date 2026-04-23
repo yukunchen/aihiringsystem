@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -134,9 +136,22 @@ public class ResumeController {
         if (!resource.exists()) {
             return ResponseEntity.notFound().build();
         }
+        MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
+        String fileType = resume.getFileType();
+        if (fileType != null && !fileType.isBlank()) {
+            try {
+                mediaType = MediaType.parseMediaType(fileType);
+            } catch (org.springframework.http.InvalidMediaTypeException ignored) {
+                // fall back to octet-stream
+            }
+        }
+        String fileName = resume.getFileName() != null ? resume.getFileName() : "resume";
+        ContentDisposition disposition = ContentDisposition.attachment()
+            .filename(fileName, StandardCharsets.UTF_8)
+            .build();
         return ResponseEntity.ok()
-            .contentType(MediaType.parseMediaType(resume.getFileType()))
-            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resume.getFileName() + "\"")
+            .contentType(mediaType)
+            .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
             .body(resource);
     }
 
