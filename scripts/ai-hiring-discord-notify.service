@@ -1,0 +1,26 @@
+[Unit]
+Description=AI Hiring — Discord notification watcher for orchestrator queue
+Documentation=https://github.com/yukunchen/aihiringsystem
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+EnvironmentFile=/etc/ai-hiring/discord.env
+ExecStart=/opt/ai-hiring/scripts/discord-notify-watcher.sh
+Restart=on-failure
+RestartSec=10s
+# Keep a reasonable journal footprint.
+StandardOutput=journal
+StandardError=journal
+# Hardening.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/opt/ai-hiring/notifications /opt/ai-hiring/logs
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
