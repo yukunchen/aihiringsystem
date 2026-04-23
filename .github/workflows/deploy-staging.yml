@@ -246,7 +246,7 @@ jobs:
             echo "Commented on issue #$ISSUE"
           done
 
-      - name: Notify Claude Code on VPS
+      - name: Notify orchestrator on VPS
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -255,21 +255,30 @@ jobs:
           envs: PASS,SHA,DETAILS,RUN_URL
           script: |
             if [ "$PASS" = "true" ]; then
-              MSG="✅ Staging Deploy Complete — commit ${SHA:0:7}"
+              export MSG="✅ Staging Deploy Complete — commit ${SHA:0:7}"
+              export NTYPE="deploy"
             else
-              MSG="❌ Staging Deploy FAILED — commit ${SHA:0:7}"
+              export MSG="❌ Staging Deploy FAILED — commit ${SHA:0:7}"
+              export NTYPE="deploy_fail"
             fi
+            # Write to the orchestrator queue so both the Discord watcher
+            # and the orchestrator Claude hook pick it up; the fixer does
+            # not need to know about deploy events.
             python3 << 'PYEOF'
             import json, datetime, os
             entry = {
-              'id': os.environ['SHA'][:7],
+              'id': 'staging-' + os.environ['SHA'][:7],
               'timestamp': datetime.datetime.utcnow().isoformat() + 'Z',
               'read': False,
+              'type': os.environ['NTYPE'],
+              'target': 'orchestrator',
               'message': os.environ.get('MSG', ''),
               'details': os.environ.get('DETAILS', ''),
               'run_url': os.environ.get('RUN_URL', '')
             }
-            with open('/opt/ai-hiring/notifications/queue.jsonl', 'a') as f:
+            queue = '/opt/ai-hiring/notifications/orchestrator-queue.jsonl'
+            os.makedirs(os.path.dirname(queue), exist_ok=True)
+            with open(queue, 'a') as f:
                 f.write(json.dumps(entry) + '\n')
             PYEOF
         env:
