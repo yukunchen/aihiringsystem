@@ -100,6 +100,20 @@ async def test_get_job_vector_returns_none_when_not_found():
 
 
 @pytest.mark.asyncio
+async def test_delete_resume_removes_point_from_collection():
+    """Regression for issue #147: orphan Qdrant vectors for deleted resumes
+    poison match results because MatchController filters them out post-search,
+    sometimes leaving no live candidates. Deleting the vector on resume delete
+    prevents the orphan from accumulating."""
+    await vs.delete_resume("resume-789")
+
+    vs.client.delete.assert_called_once()
+    call_kwargs = vs.client.delete.call_args.kwargs
+    assert call_kwargs["collection_name"] == "resumes"
+    assert call_kwargs["points_selector"].points == ["resume-789"]
+
+
+@pytest.mark.asyncio
 async def test_search_resumes_returns_scored_points():
     mock_point = MagicMock()
     mock_point.id = "resume-123"

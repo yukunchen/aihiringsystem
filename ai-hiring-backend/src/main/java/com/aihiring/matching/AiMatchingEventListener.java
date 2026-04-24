@@ -1,6 +1,7 @@
 package com.aihiring.matching;
 
 import com.aihiring.job.JobDescriptionSavedEvent;
+import com.aihiring.resume.ResumeDeletedEvent;
 import com.aihiring.resume.ResumeRepository;
 import com.aihiring.resume.ResumeStatus;
 import com.aihiring.resume.ResumeUploadedEvent;
@@ -50,6 +51,20 @@ public class AiMatchingEventListener {
             });
         } catch (Throwable t) {
             log.error("Failed to update resume {} status to {}", resumeId, target, t);
+        }
+    }
+
+    @Async
+    @EventListener
+    public void onResumeDeleted(ResumeDeletedEvent event) {
+        // Prevent orphan vectors: when a resume is deleted from the DB,
+        // remove its Qdrant vector too. Otherwise stale vectors accumulate
+        // and can crowd out live resumes in similarity search results.
+        log.info("Deleting resume vector {}", event.getResumeId());
+        try {
+            client.deleteResumeVector(event.getResumeId());
+        } catch (Throwable t) {
+            log.error("Unexpected error deleting resume vector {}", event.getResumeId(), t);
         }
     }
 

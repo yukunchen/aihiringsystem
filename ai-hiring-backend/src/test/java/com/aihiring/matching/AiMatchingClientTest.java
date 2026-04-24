@@ -82,6 +82,31 @@ class AiMatchingClientTest {
     }
 
     @Test
+    void deleteResumeVector_success_returnsTrue() {
+        UUID resumeId = UUID.randomUUID();
+        wm.stubFor(delete(urlEqualTo("/internal/vectorize/resume/" + resumeId))
+            .willReturn(aResponse().withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("{\"status\":\"ok\"}")));
+
+        boolean result = client.deleteResumeVector(resumeId);
+
+        assertThat(result).isTrue();
+        wm.verify(deleteRequestedFor(urlEqualTo("/internal/vectorize/resume/" + resumeId)));
+    }
+
+    @Test
+    void deleteResumeVector_serviceError_returnsFalse() {
+        UUID resumeId = UUID.randomUUID();
+        wm.stubFor(delete(urlEqualTo("/internal/vectorize/resume/" + resumeId))
+            .willReturn(aResponse().withStatus(500)));
+
+        boolean result = client.deleteResumeVector(resumeId);
+
+        assertThat(result).isFalse();
+    }
+
+    @Test
     void match_returnsDeserializedResponse() {
         UUID jobId = UUID.randomUUID();
         wm.stubFor(post(urlEqualTo("/match"))

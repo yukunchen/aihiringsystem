@@ -2,6 +2,7 @@ package com.aihiring.matching;
 
 import com.aihiring.job.JobDescriptionSavedEvent;
 import com.aihiring.resume.Resume;
+import com.aihiring.resume.ResumeDeletedEvent;
 import com.aihiring.resume.ResumeRepository;
 import com.aihiring.resume.ResumeStatus;
 import com.aihiring.resume.ResumeUploadedEvent;
@@ -99,6 +100,27 @@ class AiMatchingEventListenerTest {
 
         assertThat(resume.getStatus()).isEqualTo(ResumeStatus.VECTORIZATION_FAILED);
         verify(resumeRepository).save(resume);
+    }
+
+    @Test
+    void onResumeDeleted_callsDeleteResumeVector() {
+        UUID resumeId = UUID.randomUUID();
+        var event = new ResumeDeletedEvent(this, resumeId);
+
+        listener.onResumeDeleted(event);
+
+        verify(client).deleteResumeVector(resumeId);
+    }
+
+    @Test
+    void onResumeDeleted_clientThrows_doesNotPropagate() {
+        UUID resumeId = UUID.randomUUID();
+        var event = new ResumeDeletedEvent(this, resumeId);
+        when(client.deleteResumeVector(resumeId)).thenThrow(new RuntimeException("boom"));
+
+        listener.onResumeDeleted(event);
+
+        verify(client).deleteResumeVector(resumeId);
     }
 
     @Test
