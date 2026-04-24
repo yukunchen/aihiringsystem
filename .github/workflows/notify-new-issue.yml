@@ -2,12 +2,14 @@ name: Notify Autofix Issue
 
 on:
   issues:
-    types: [opened, labeled]
+    types: [opened, labeled, reopened]
 
 jobs:
   notify:
     if: contains(github.event.issue.labels.*.name, 'autofix')
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
     steps:
       - name: Write to VPS notification queue
         uses: appleboy/ssh-action@v1
@@ -15,40 +17,61 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          envs: ISSUE_NUMBER,ISSUE_TITLE,ISSUE_LABELS,ISSUE_URL,ISSUE_BODY
+          envs: ISSUE_NUMBER,ISSUE_TITLE,ISSUE_LABELS,ISSUE_URL,ISSUE_BODY,EVENT_ACTION
           script: |
             python3 << 'PYEOF'
             import json, datetime, os
             queue_path = '/opt/ai-hiring/notifications/queue.jsonl'
-            entry_id = f'issue-{os.environ["ISSUE_NUMBER"]}'
+            processed_file = '/opt/ai-hiring/processed-issues.txt'
+            issue_num = os.environ['ISSUE_NUMBER']
+            action = os.environ.get('EVENT_ACTION', 'opened')
 
-            # Dedup: GitHub fires both `opened` and one `labeled` event per label
-            # added by issue-triage.yml, so this workflow runs multiple times per
-            # issue. Skip if the queue already contains an entry with this id.
-            try:
-                with open(queue_path) as f:
-                    for line in f:
-                        line = line.strip()
-                        if not line:
-                            continue
-                        try:
-                            if json.loads(line).get('id') == entry_id:
-                                print(f'Skip duplicate notification for {entry_id}')
-                                raise SystemExit(0)
-                        except json.JSONDecodeError:
-                            continue
-            except FileNotFoundError:
-                pass
+            # `reopened` must bypass the normal 'issue-<N>' dedup (the
+            # first open of the same issue wrote one already) AND also
+            # un-dedupe the watch-issues cron side: drop the issue number
+            # from processed-issues.txt so the next cron cycle will
+            # redispatch. Without this, reopening an issue was a no-op —
+            # both the queue writer and the cron dedup kept swallowing it.
+            if action == 'reopened':
+                entry_id = f'issue-{issue_num}-reopen-{datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S")}'
+                try:
+                    with open(processed_file) as f:
+                        kept = [l for l in f if l.strip() and l.strip() != issue_num]
+                    with open(processed_file, 'w') as f:
+                        f.writelines(kept)
+                    print(f'Removed #{issue_num} from processed-issues.txt')
+                except FileNotFoundError:
+                    pass
+            else:
+                entry_id = f'issue-{issue_num}'
+                # Dedup only for opened/labeled bursts (triage adds several
+                # labels in quick succession → multiple workflow runs).
+                try:
+                    with open(queue_path) as f:
+                        for line in f:
+                            line = line.strip()
+                            if not line:
+                                continue
+                            try:
+                                if json.loads(line).get('id') == entry_id:
+                                    print(f'Skip duplicate notification for {entry_id}')
+                                    raise SystemExit(0)
+                            except json.JSONDecodeError:
+                                continue
+                except FileNotFoundError:
+                    pass
 
+            prefix = '🔁 Autofix re-opened' if action == 'reopened' else '🔧 Autofix issue'
             entry = {
               'id': entry_id,
               'timestamp': datetime.datetime.utcnow().isoformat() + 'Z',
               'read': False,
               'type': 'new_issue',
-              'message': f'🔧 Autofix issue #{os.environ["ISSUE_NUMBER"]}: {os.environ["ISSUE_TITLE"]}',
-              'details': f'Labels: {os.environ.get("ISSUE_LABELS","")}\nURL: {os.environ["ISSUE_URL"]}\n\n{os.environ.get("ISSUE_BODY","")[:500]}',
+              'message': f'{prefix} #{issue_num}: {os.environ["ISSUE_TITLE"]}',
+              'details': f'Event: {action}\nLabels: {os.environ.get("ISSUE_LABELS","")}\nURL: {os.environ["ISSUE_URL"]}\n\n{os.environ.get("ISSUE_BODY","")[:500]}',
               'run_url': os.environ["ISSUE_URL"]
             }
+            os.makedirs(os.path.dirname(queue_path), exist_ok=True)
             with open(queue_path, 'a') as f:
                 f.write(json.dumps(entry) + '\n')
             PYEOF
@@ -58,3 +81,17 @@ jobs:
           ISSUE_LABELS: ${{ join(github.event.issue.labels.*.name, ', ') }}
           ISSUE_URL: ${{ github.event.issue.html_url }}
           ISSUE_BODY: ${{ github.event.issue.body }}
+          EVENT_ACTION: ${{ github.event.action }}
+
+      - name: Release stale autofix-in-progress label on reopen
+        # A prior failed autofix may have left the advisory lock behind.
+        # Reopening the issue is the user's explicit "try again" signal,
+        # so clear the lock unconditionally here. autofix-claim.sh on the
+        # VPS will re-acquire it before the fixer actually starts.
+        if: github.event.action == 'reopened' && contains(github.event.issue.labels.*.name, 'autofix-in-progress')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue edit "${{ github.event.issue.number }}" \
+            --repo "${{ github.repository }}" \
+            --remove-label 'autofix-in-progress' || true
