@@ -24,12 +24,23 @@ public class MatchController {
     private final MatchService matchService;
     private final ResumeRepository resumeRepository;
 
+    // Over-fetch candidates from AI service so orphan-vector filtering (resumes present
+    // in Qdrant but no longer in DB) still leaves enough live matches to fill top_k.
+    // See issue #147.
+    static final int ORPHAN_OVERFETCH_MULTIPLIER = 3;
+    static final int ORPHAN_OVERFETCH_CAP = 50;
+
     @PostMapping
     @PreAuthorize("hasAuthority('job:read')")
     public ApiResponse<MatchResponse> match(@Valid @RequestBody MatchRequest request) {
+        int requestedTopK = request.getTopK();
+        int fetchTopK = Math.min(requestedTopK * ORPHAN_OVERFETCH_MULTIPLIER, ORPHAN_OVERFETCH_CAP);
+        if (fetchTopK < requestedTopK) {
+            fetchTopK = requestedTopK;
+        }
         AiMatchResponse aiResponse;
         try {
-            aiResponse = matchService.match(request.getJobId(), request.getTopK());
+            aiResponse = matchService.match(request.getJobId(), fetchTopK);
         } catch (HttpClientErrorException.NotFound e) {
             throw new BusinessException(422, "Job not ready for matching, please try again shortly");
         } catch (ResourceAccessException e) {
@@ -77,6 +88,7 @@ public class MatchController {
                 item.getVectorScore(), item.getLlmScore(),
                 item.getReasoning(), item.getHighlights()
             ))
+            .limit(requestedTopK)
             .collect(Collectors.toList());
 
         return ApiResponse.success(new MatchResponse(
