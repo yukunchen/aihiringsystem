@@ -115,6 +115,37 @@ class MatchControllerIntegrationTest {
     }
 
     @Test
+    void match_overFetchesFromAiServiceToSurviveOrphanVectorFiltering() throws Exception {
+        // Regression for issue #147: orphan vectors (present in Qdrant but not in DB) can
+        // occupy top-K slots returned by the AI service, leaving zero results after orphan
+        // filtering. The backend must request more than top_k candidates from the AI
+        // service so orphan filtering still leaves room for live matches.
+        UUID jobId = UUID.randomUUID();
+        String aiResponseBody = """
+            {
+              "job_id": "%s",
+              "results": []
+            }
+            """.formatted(jobId);
+
+        wireMock.stubFor(WireMock.post(WireMock.urlEqualTo("/match"))
+            .willReturn(WireMock.aResponse()
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody(aiResponseBody)));
+
+        mockMvc.perform(post("/api/match")
+                .with(adminUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"jobId\": \"%s\", \"topK\": 10}".formatted(jobId)))
+            .andExpect(status().isOk());
+
+        wireMock.verify(WireMock.postRequestedFor(WireMock.urlEqualTo("/match"))
+            .withRequestBody(WireMock.matchingJsonPath("$.top_k",
+                WireMock.matching("([3-9][0-9]|[1-9][0-9]{2,})"))));
+    }
+
+    @Test
     void match_whenAiServiceReturns404_propagates422() throws Exception {
         wireMock.stubFor(WireMock.post(WireMock.urlEqualTo("/match"))
             .willReturn(WireMock.aResponse()
