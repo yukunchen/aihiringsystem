@@ -308,6 +308,33 @@ jobs:
           DETAILS: ${{ steps.smoke.outputs.details }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
+      - name: Auto-close stale staging-failure issues
+        # When staging goes green again, any previously auto-filed
+        # "Staging deploy failed at ..." issues are superseded. They are
+        # almost always transient infra flakes (GHCR 502, runner network
+        # blip). Leaving them open is pure noise. Close them with a
+        # reference to the succeeding run so the audit trail stays.
+        if: steps.smoke.outputs.pass == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          STALE=$(gh issue list --repo "${{ github.repository }}" \
+              --state open --label deployment \
+              --search "Staging deploy failed in:title" \
+              --json number --jq '.[].number' || echo "")
+          for N in $STALE; do
+            gh issue close "$N" --repo "${{ github.repository }}" \
+              --reason "not planned" \
+              --comment "Auto-closed: superseded by successful staging deploy of \`${SHA:0:7}\`.
+
+            The failure this issue recorded was a transient infrastructure flake that subsequent runs bypassed. If you were tracking a real recurring issue, please reopen with reproduction steps.
+
+            Run: ${RUN_URL}" \
+              && echo "closed #$N" || echo "failed to close #$N"
+          done
+
       - name: Fail the job if any smoke check failed
         # Placed AFTER the orchestrator-notify step so Discord still
         # receives the failure ping. Without this, smoke setting
