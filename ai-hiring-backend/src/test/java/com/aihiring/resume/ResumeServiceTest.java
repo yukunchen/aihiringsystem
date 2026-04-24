@@ -201,6 +201,20 @@ class ResumeServiceTest {
     }
 
     @Test
+    void delete_shouldPublishResumeDeletedEvent() {
+        UUID id = UUID.randomUUID();
+        Resume resume = new Resume(); resume.setId(id); resume.setFilePath("/uploads/resumes/uuid.pdf");
+        when(resumeRepository.findById(id)).thenReturn(Optional.of(resume));
+
+        resumeService.delete(id);
+
+        org.mockito.ArgumentCaptor<ResumeDeletedEvent> captor =
+            org.mockito.ArgumentCaptor.forClass(ResumeDeletedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertEquals(id, captor.getValue().getResumeId());
+    }
+
+    @Test
     void updateStructured_shouldUpdateFieldsAndSetAiProcessed() {
         UUID id = UUID.randomUUID();
         Resume resume = new Resume(); resume.setId(id); resume.setStatus(ResumeStatus.TEXT_EXTRACTED);

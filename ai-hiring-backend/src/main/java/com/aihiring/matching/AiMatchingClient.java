@@ -42,6 +42,19 @@ public class AiMatchingClient {
         }
     }
 
+    public boolean deleteResumeVector(UUID resumeId) {
+        try {
+            restClient.delete()
+                .uri("/internal/vectorize/resume/{id}", resumeId)
+                .retrieve()
+                .toBodilessEntity();
+            return true;
+        } catch (RestClientException e) {
+            log.warn("Failed to delete resume vector {}: {}", resumeId, e.getMessage());
+            return false;
+        }
+    }
+
     public boolean vectorizeJob(UUID jobId, String title, String description,
                               String requirements, String skills) {
         try {

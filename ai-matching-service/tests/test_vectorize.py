@@ -75,6 +75,29 @@ def test_vectorize_job_constructs_text_with_all_fields(client):
     assert "Python" in embedded_text
 
 
+def test_delete_resume_vector_calls_vector_store(client):
+    """Regression for issue #147: resume deletion must remove its Qdrant vector
+    so stale vectors don't poison match results."""
+    delete_mock = AsyncMock()
+    with patch("services.vector_store.delete_resume", new=delete_mock):
+        response = client.delete(
+            "/internal/vectorize/resume/550e8400-e29b-41d4-a716-446655440002"
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+    delete_mock.assert_called_once_with("550e8400-e29b-41d4-a716-446655440002")
+
+
+def test_delete_resume_vector_is_idempotent(client):
+    """Deleting a non-existent vector is not an error — Qdrant delete is a no-op."""
+    with patch("services.vector_store.delete_resume", new=AsyncMock()):
+        response = client.delete(
+            "/internal/vectorize/resume/550e8400-e29b-41d4-a716-446655440003"
+        )
+    assert response.status_code == 200
+
+
 def test_vectorize_job_upsert_is_idempotent(client):
     """Re-vectorizing the same ID overwrites — upsert is called each time."""
     upsert_mock = AsyncMock()

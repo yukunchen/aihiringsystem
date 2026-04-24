@@ -15,6 +15,12 @@ async def vectorize_resume(request: VectorizeResumeRequest):
     return VectorizeResponse(status="ok")
 
 
+@router.delete("/resume/{resume_id}", response_model=VectorizeResponse, response_model_exclude_none=True)
+async def delete_resume_vector(resume_id: str):
+    await vector_store.delete_resume(resume_id)
+    return VectorizeResponse(status="ok")
+
+
 @router.post("/job", response_model=VectorizeResponse, response_model_exclude_none=True)
 async def vectorize_job(request: VectorizeJobRequest):
     job_text = f"Title: {request.title}\n\nDescription:\n{request.description}"

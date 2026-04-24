@@ -138,6 +138,7 @@ public class ResumeService {
         Resume resume = getById(id);
         fileStorageService.delete(resume.getFilePath());
         resumeRepository.delete(resume);
+        eventPublisher.publishEvent(new ResumeDeletedEvent(this, id));
     }
 
     @Transactional

@@ -1,5 +1,5 @@
 from qdrant_client import AsyncQdrantClient
-from qdrant_client.models import Distance, VectorParams, PointStruct
+from qdrant_client.models import Distance, VectorParams, PointStruct, PointIdsList
 from config import settings
 
 client = AsyncQdrantClient(host=settings.qdrant_host, port=settings.qdrant_port)
@@ -62,6 +62,13 @@ async def get_job_record(job_id: str):
         collection_name=JOBS, ids=[job_id], with_vectors=True
     )
     return results[0] if results else None
+
+
+async def delete_resume(resume_id: str):
+    await client.delete(
+        collection_name=RESUMES,
+        points_selector=PointIdsList(points=[resume_id]),
+    )
 
 
 async def search_resumes(job_vector: list[float], top_k: int):
