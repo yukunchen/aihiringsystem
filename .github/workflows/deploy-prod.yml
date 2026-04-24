@@ -154,6 +154,32 @@ jobs:
           SHA: ${{ needs.verify.outputs.resolved_version }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
+      - name: Auto-close stale prod-failure issues
+        # A successful prod deploy (with health checks green) means the
+        # condition that the prior "Production deploy failed and rolled
+        # back" issues were recording is resolved. Close them with a
+        # reference back to this run.
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ needs.verify.outputs.resolved_version }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          STALE=$(gh issue list --repo "${{ github.repository }}" \
+              --state open --label deployment \
+              --search "Production deploy failed in:title" \
+              --json number --jq '.[].number' || echo "")
+          for N in $STALE; do
+            gh issue close "$N" --repo "${{ github.repository }}" \
+              --reason "not planned" \
+              --comment "Auto-closed: superseded by successful production deploy of \`${SHA:0:7}\`.
+
+            Prior failure was either a transient infra issue or has since been re-rolled forward. If a real problem remains, please reopen with reproduction steps.
+
+            Run: ${RUN_URL}" \
+              && echo "closed #$N" || echo "failed to close #$N"
+          done
+
   rollback:
     needs: [verify, deploy]
     if: failure()
