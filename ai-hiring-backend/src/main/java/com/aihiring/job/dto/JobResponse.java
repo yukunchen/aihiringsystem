@@ -21,17 +21,11 @@ public class JobResponse {
     private String salaryRange;
     private String location;
     private JobStatus status;
-    private DepartmentInfo department;
+    private UUID departmentId;
+    private String departmentName;
     private CreatedByInfo createdBy;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-
-    @Getter
-    @AllArgsConstructor
-    public static class DepartmentInfo {
-        private UUID id;
-        private String name;
-    }
 
     @Getter
     @AllArgsConstructor
@@ -52,10 +46,8 @@ public class JobResponse {
             job.getSalaryRange(),
             job.getLocation(),
             job.getStatus(),
-            new DepartmentInfo(
-                job.getDepartment().getId(),
-                job.getDepartment().getName()
-            ),
+            job.getDepartment().getId(),
+            job.getDepartment().getName(),
             new CreatedByInfo(
                 job.getCreatedBy().getId(),
                 job.getCreatedBy().getUsername()

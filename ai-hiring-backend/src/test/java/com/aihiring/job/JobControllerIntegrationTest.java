@@ -84,7 +84,8 @@ class JobControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.status").value("DRAFT"))
-                .andExpect(jsonPath("$.data.department.name").value("Engineering"));
+                .andExpect(jsonPath("$.data.departmentName").value("Engineering"))
+                .andExpect(jsonPath("$.data.departmentId").exists());
     }
 
     @Test

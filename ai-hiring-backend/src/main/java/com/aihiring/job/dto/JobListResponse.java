@@ -20,7 +20,8 @@ public class JobListResponse {
     private String salaryRange;
     private String location;
     private JobStatus status;
-    private JobResponse.DepartmentInfo department;
+    private UUID departmentId;
+    private String departmentName;
     private LocalDateTime createdAt;
 
     private static final int DESCRIPTION_PREVIEW_LENGTH = 200;
@@ -40,10 +41,8 @@ public class JobListResponse {
             job.getSalaryRange(),
             job.getLocation(),
             job.getStatus(),
-            new JobResponse.DepartmentInfo(
-                job.getDepartment().getId(),
-                job.getDepartment().getName()
-            ),
+            job.getDepartment().getId(),
+            job.getDepartment().getName(),
             job.getCreatedAt()
         );
     }
